@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "pyyaml>=6.0.2",
     "sqlalchemy>=2.0.43",
+    "tzdata>=2025.2",
 ]
 
 [[tool.uv.index]]
