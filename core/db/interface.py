@@ -39,17 +39,21 @@ class DatabaseConfig(BaseModel, extra="ignore"):
     @property
     def database_url(self) -> str:
         if self.type == "sqlite":
+            if not self.path:
+                raise ValueError("SQLite database path is required")
             return f"sqlite+aiosqlite:///{self.path}"
-        elif self.type == "postgresql":
+        if not all([self.username, self.password, self.host, self.port, self.db]):
+            raise ValueError("Database configuration is incomplete")
+        if self.type == "postgresql":
             return (
                 f"postgresql+asyncpg://"
-                f"{quote_plus(self.username or '')}:{quote_plus(self.password or '')}"
+                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
                 f"@{self.host}:{self.port}/{self.db}"
             )
         elif self.type == "mysql":
             return (
                 f"mysql+asyncmy://"
-                f"{quote_plus(self.username or '')}:{quote_plus(self.password or '')}"
+                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
                 f"@{self.host}:{self.port}/{self.db}"
             )
         else:
