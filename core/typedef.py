@@ -1,0 +1,187 @@
+from typing import Literal
+from pydantic import BaseModel
+from abc import ABC, abstractmethod
+
+import aiotieba.typing
+from aiotieba.api.get_threads._classdef import FragImage_t
+from aiotieba.api.get_posts._classdef import FragImage_p
+
+
+class User(BaseModel):
+    user_name: str
+    nick_name: str
+    user_id: int
+    portrait: str
+    level: int
+
+    @staticmethod
+    def from_aiotieba_data(
+        data: aiotieba.typing.Thread | aiotieba.typing.Post | aiotieba.typing.Comment,
+    ):
+        return User(
+            user_name=data.user.user_name,
+            nick_name=data.user.nick_name,
+            user_id=data.user.user_id,
+            portrait=data.user.portrait,
+            level=data.user.level,
+        )
+
+    @property
+    def log_name(self) -> str:
+        """
+        Get log name
+        """
+        if self.user_name:
+            return self.user_name
+        elif self.portrait:
+            return f"{self.nick_name}/{self.portrait}"
+        else:
+            return str(self.user_id)
+
+
+class Image(BaseModel):
+    hash: str
+    width: int
+    height: int
+    src: str
+
+
+class ContentInterface(ABC):
+    # 当type=thread时，表示thread自身的title，当type=post或comment时，表示post或comment所处主题帖的title
+
+    fname: str
+    title: str | None = None
+    text: str
+    images: list[Image]
+    create_time: int
+    tid: int
+    pid: int
+    floor: int
+    user: User
+
+    @classmethod
+    @abstractmethod
+    def from_aiotieba_data(cls, data) -> "ContentInterface":
+        """
+        Convert data to CommonStructure
+        """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def get_images_from_aiotieba_contents(contents) -> list[Image]:
+        """
+        Get image from contents
+        """
+        ...
+
+
+class BaseContent(BaseModel):
+    fname: str
+    title: str | None = None
+    text: str
+    images: list[Image]
+    create_time: int
+    tid: int
+    pid: int
+    floor: int
+    user: User
+
+
+class Thread(BaseContent, ContentInterface):
+    floor: int = 1
+    type: Literal["Thread"] = "Thread"
+
+    @classmethod
+    def from_aiotieba_data(cls, data: aiotieba.typing.Thread):
+        return cls(
+            fname=data.fname,
+            title=data.title,
+            text=data.text.removeprefix(data.title + "\n"),
+            images=cls.get_images_from_aiotieba_contents(data.contents),
+            create_time=data.create_time,
+            tid=data.tid,
+            pid=data.pid,
+            user=User.from_aiotieba_data(data),
+        )
+
+    @staticmethod
+    def get_images_from_aiotieba_contents(contents) -> list[Image]:
+        images: list[Image] = []
+        for content in contents:
+            if isinstance(content, FragImage_t):
+                images.append(
+                    Image(
+                        hash=content.hash,
+                        width=content.show_width,
+                        height=content.show_height,
+                        src=content.origin_src,
+                    )
+                )
+        return images
+
+
+class Post(BaseContent, ContentInterface):
+    type: Literal["Post"] = "Post"
+
+    @classmethod
+    def from_aiotieba_data(cls, data: aiotieba.typing.Post, title: str | None = None):
+        return cls(
+            fname=data.fname,
+            title=title,
+            text=data.text,
+            images=cls.get_images_from_aiotieba_contents(data.contents),
+            create_time=data.create_time,
+            tid=data.tid,
+            pid=data.pid,
+            floor=data.floor,
+            user=User.from_aiotieba_data(data),
+        )
+
+    @staticmethod
+    def get_images_from_aiotieba_contents(contents) -> list[Image]:
+        """
+        Find image from contents
+        """
+        images: list[Image] = []
+        for content in contents:
+            if isinstance(content, FragImage_p):
+                images.append(
+                    Image(
+                        hash=content.hash,
+                        width=content.show_width,
+                        height=content.show_height,
+                        src=content.origin_src,
+                    )
+                )
+        return images
+
+
+class Comment(BaseContent, ContentInterface):
+    type: Literal["Comment"] = "Comment"
+
+    @classmethod
+    def from_aiotieba_data(
+        cls, data: aiotieba.typing.Comment, title: str | None = None
+    ):
+        return cls(
+            fname=data.fname,
+            title=title,
+            text=data.text,
+            images=[],
+            create_time=data.create_time,
+            tid=data.tid,
+            pid=data.pid,
+            floor=data.floor,
+            user=User.from_aiotieba_data(data),
+        )
+
+    @staticmethod
+    def get_images_from_aiotieba_contents(contents) -> list[Image]:
+        """
+        Find image from contents
+        """
+        return []
+
+
+Content = Thread | Post | Comment

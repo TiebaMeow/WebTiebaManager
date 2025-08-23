@@ -1,0 +1,23 @@
+- name: rule1
+  operation: "delete"
+  rules:
+    - type: "ContentText"
+      options:
+        text: "test text"
+    - type: "Level"
+      options:
+        min: 3
+
+- name: rule3
+  operation:
+    - type: "Delete"
+    - type: "Block"
+      options:
+        reason: "测试"
+  rules:
+    - type: "ContentText"
+      options:
+        text: "test text"
+    - type: "Level"
+      options:
+        min: 3
