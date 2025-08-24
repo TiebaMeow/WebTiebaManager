@@ -1,6 +1,6 @@
-from .util.event import AsyncEvent
 from .config import config
 from .typedef import Content
+from .util.event import AsyncEvent
 
 
 class Controller:

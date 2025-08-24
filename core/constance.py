@@ -4,7 +4,7 @@ from pathlib import Path
 PROGRAM_VERSION = "1.0.0"
 CONFIG_VERSION = 1
 
-BASE_DIR = Path('WebTMData')
+BASE_DIR = Path("WebTMData")
 
 if not BASE_DIR.exists():
     BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -25,7 +25,7 @@ PROGRAM_NAME = "WebTM"
 LOG_FILE_NAME = "webtm.log"
 LOG_DIR = BASE_DIR / "logs"
 
-USER_DIR = BASE_DIR / 'users'
+USER_DIR = BASE_DIR / "users"
 
 
 for i in [

@@ -4,6 +4,7 @@ import time
 import traceback
 from typing import Literal, TypedDict
 
+import aiofiles
 import aiohttp
 from pydantic import BaseModel
 
@@ -128,9 +129,7 @@ class TiebaBrowser:
         data["sign"] = hashlib.md5(buffer.encode("utf-8")).hexdigest()
 
     async def get_tbs(self):
-        async with self._session.get(
-            "http://tieba.baidu.com/dc/common/tbs", headers=self._hd2
-        ) as res:
+        async with self._session.get("http://tieba.baidu.com/dc/common/tbs", headers=self._hd2) as res:
             data = json.loads(await res.text())
         return data["tbs"]
 
@@ -144,24 +143,19 @@ class TiebaBrowser:
         **kwargs,
     ):
         data = (
-            {
-                key: value if isinstance(value, str) else str(value)
-                for key, value in data.items()
-            }
+            {key: value if isinstance(value, str) else str(value) for key, value in data.items()}
             if data is not None
             else {}
         )
         if need_tbs:
             data["tbs"] = self._tbs
         if need_timestamp:
-            data["timestamp"] = "{0}".format(time.time())
+            data["timestamp"] = f"{time.time()}"
         if need_sign:
             self.__add_sign(data)
         return self._session.post(url, data=data, allow_redirects=False, **kwargs)
 
-    async def get_posts(
-        self, tid: int, pn: int = 1, rn: int = 30, comment_rn: int = 4, **kwargs
-    ) -> GetPostData:
+    async def get_posts(self, tid: int, pn: int = 1, rn: int = 30, comment_rn: int = 4, **kwargs) -> GetPostData:
         data = {
             "_client_type": 2,
             "_client_version": "7.0.0",
@@ -264,16 +258,15 @@ class TiebaBrowser:
                 total_page=data["page"]["total_page"],
                 reply_num=reply_num,
             )
-
         except Exception as e:
             try:
-                with open("fetch_post_data.json", "wt", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
+                async with aiofiles.open("fetch_post_data.json", "w", encoding="utf-8") as f:
+                    await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+            except Exception:
                 pass
-            with open("fetch_post_error.txt", "at", encoding="utf-8") as f:
-                f.write(f"-----{timestring()}-----\n")
-                f.write(f"{traceback.format_exc()}\n\n")
+            async with aiofiles.open("fetch_post_error.txt", "a", encoding="utf-8") as f:
+                await f.write(f"-----{timestring()}-----\n")
+                await f.write(f"{traceback.format_exc()}\n\n")
 
             return GetPostData()
             raise e

@@ -1,7 +1,7 @@
-import sys
-import time
 import asyncio
 import platform
+import sys
+import time
 import uuid
 
 
@@ -12,7 +12,7 @@ def timestring():
 def wait_and_exit():
     input("程序已结束...")
     sys.exit(0)
-    raise KeyboardInterrupt()
+    raise KeyboardInterrupt
 
 
 def int_time() -> int:
@@ -22,8 +22,7 @@ def int_time() -> int:
 def iter_progress():
     progress = ["-", "\\", "|", "/"]
     while True:
-        for p in progress:
-            yield p
+        yield from progress
 
 
 class EtaSleep:
@@ -83,6 +82,7 @@ def is_windows_server_2012() -> bool:
 
 def uuid4() -> str:
     return uuid.uuid4().hex
+
 
 class Timer:
     def __init__(self):

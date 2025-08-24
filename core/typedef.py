@@ -1,10 +1,10 @@
-from typing import Literal
-from pydantic import BaseModel
 from abc import ABC, abstractmethod
+from typing import Literal
 
 import aiotieba.typing
-from aiotieba.api.get_threads._classdef import FragImage_t
 from aiotieba.api.get_posts._classdef import FragImage_p
+from aiotieba.api.get_threads._classdef import FragImage_t
+from pydantic import BaseModel
 
 
 class User(BaseModel):
@@ -89,18 +89,18 @@ class BaseContent(BaseModel):
 
     @property
     def mark(self):
-        _type:Literal["Thread",'Post','Comment'] = self.type # type: ignore
+        _type: Literal["Thread", "Post", "Comment"] = self.type  # type: ignore
 
-        if _type == 'Thread':
+        if _type == "Thread":
             return self.title
-        elif _type == 'Post':
-            return f'{self.title} {self.floor}楼'
+        elif _type == "Post":
+            return f"{self.title} {self.floor}楼"
         else:
-            return f'{self.title} {self.floor}楼 楼中楼'
-    
+            return f"{self.title} {self.floor}楼 楼中楼"
+
     @property
     def link(self):
-        return f'https://tieba.baidu.com/p/{self.tid}' + ('' if self.type == 'Thread' else f'?{self.pid}#{self.pid}') # type: ignore
+        return f"https://tieba.baidu.com/p/{self.tid}" + ("" if self.type == "Thread" else f"?{self.pid}#{self.pid}")  # type: ignore
 
 
 class Thread(BaseContent, ContentInterface):
@@ -122,18 +122,16 @@ class Thread(BaseContent, ContentInterface):
 
     @staticmethod
     def get_images_from_aiotieba_contents(contents) -> list[Image]:
-        images: list[Image] = []
-        for content in contents:
-            if isinstance(content, FragImage_t):
-                images.append(
-                    Image(
-                        hash=content.hash,
-                        width=content.show_width,
-                        height=content.show_height,
-                        src=content.origin_src,
-                    )
-                )
-        return images
+        return [
+            Image(
+                hash=content.hash,
+                width=content.show_width,
+                height=content.show_height,
+                src=content.origin_src,
+            )
+            for content in contents
+            if isinstance(content, FragImage_t)
+        ]
 
 
 class Post(BaseContent, ContentInterface):
@@ -158,27 +156,23 @@ class Post(BaseContent, ContentInterface):
         """
         Find image from contents
         """
-        images: list[Image] = []
-        for content in contents:
-            if isinstance(content, FragImage_p):
-                images.append(
-                    Image(
-                        hash=content.hash,
-                        width=content.show_width,
-                        height=content.show_height,
-                        src=content.origin_src,
-                    )
-                )
-        return images
+        return [
+            Image(
+                hash=content.hash,
+                width=content.show_width,
+                height=content.show_height,
+                src=content.origin_src,
+            )
+            for content in contents
+            if isinstance(content, FragImage_p)
+        ]
 
 
 class Comment(BaseContent, ContentInterface):
     type: Literal["Comment"] = "Comment"
 
     @classmethod
-    def from_aiotieba_data(
-        cls, data: aiotieba.typing.Comment, title: str | None = None
-    ):
+    def from_aiotieba_data(cls, data: aiotieba.typing.Comment, title: str | None = None):
         return cls(
             fname=data.fname,
             title=title,

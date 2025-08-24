@@ -35,7 +35,7 @@ class Crawler:
     browser: TiebaBrowser
     eta: EtaSleep
 
-    class InvalidContent(Exception):
+    class InvalidContentError(Exception):
         pass
 
     def __init__(self):
@@ -65,7 +65,9 @@ class Crawler:
             await self.browser.__aexit__()
             self.browser = None  # type: ignore
 
-    async def crawl(self, forum: str, need: CrawlNeed = CrawlNeed()):
+    async def crawl(self, forum: str, need: CrawlNeed | None = None):
+        if need is None:
+            need = CrawlNeed()
         await self.init_client()
 
         scan = Controller.config.scan
@@ -93,10 +95,10 @@ class Crawler:
             reply_num_dict: dict[int, int] = {}
 
             async def get_posts(pn):
-                data = await self.browser.get_posts(thread.tid, pn=pn)
-                raw_posts.extend(data.posts)
-                raw_comments.extend(data.comments)
-                reply_num_dict.update(data.reply_num)
+                data = await self.browser.get_posts(thread.tid, pn=pn)  # noqa: B023
+                raw_posts.extend(data.posts)  # noqa: B023
+                raw_comments.extend(data.comments)  # noqa: B023
+                reply_num_dict.update(data.reply_num)  # noqa: B023
                 return data
 
             async with self.eta:

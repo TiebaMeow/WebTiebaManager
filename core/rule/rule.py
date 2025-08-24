@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from pydantic import BaseModel, TypeAdapter
+
 from ..process.typedef import ProcessObject
 
 
@@ -27,9 +28,7 @@ class RuleTemplate(BaseModel, ABC):
 
 class RuleGroup:
     def __init__(self, rules: list[RuleTemplate]) -> None:
-        self.rules: list[RuleTemplate] = sorted(
-            (i for i in rules if i.valid), key=lambda x: x.priority, reverse=True
-        )
+        self.rules: list[RuleTemplate] = sorted((i for i in rules if i.valid), key=lambda x: x.priority, reverse=True)
 
     def __iter__(self):
         return iter(self.rules)
@@ -69,13 +68,11 @@ class Rules:
             default_rule = rule(options=default_options)
             try:
                 rule_type = default_rule.type  # type: ignore
-            except AttributeError:
-                raise Exception("规则类型未定义")
+            except AttributeError as e:
+                raise Exception("规则类型未定义") from e
 
             cls.rule_dict[rule_type] = rule  # type: ignore
-            cls.rule_info[rule_type] = RuleInfo(
-                type=rule_type, name=name, category=category, description=description
-            )
+            cls.rule_info[rule_type] = RuleInfo(type=rule_type, name=name, category=category, description=description)
 
             return rule
 
@@ -88,9 +85,7 @@ class Rules:
             description: str = "无描述",
             default_options: Any = None,
         ):
-            return cls.register(
-                name, category, description=description, default_options=default_options
-            )
+            return cls.register(name, category, description=description, default_options=default_options)
 
         return _
 

@@ -1,6 +1,7 @@
 from core.rule.rule_set import RuleSet
-from .typedef import ProcessObject
 from core.user.config import UserConfig
+
+from .typedef import ProcessObject
 
 
 class Processer:

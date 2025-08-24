@@ -1,9 +1,11 @@
+import asyncio
+import json
 import os
 import time
-import json
-import asyncio
+from collections.abc import Callable
 from functools import wraps
-from typing import TypeVar, Generic, Callable
+from pathlib import Path
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -13,6 +15,7 @@ class ExpireCache(Generic[T]):
     注意：虽然key可以为多种类型，但实际储存时仍为str（json限制）
     这可能导致意外的key重复，如 '123'(str) 与 123(int)，请只使用同一类型的key
     """
+
     POSSIBLE_KEY = str | int | float
 
     def __init__(
@@ -28,11 +31,11 @@ class ExpireCache(Generic[T]):
 
         if clear_after_set:
 
-            def set(key: ExpireCache.POSSIBLE_KEY, data: T):
+            def set_(key: ExpireCache.POSSIBLE_KEY, data: T):
                 ExpireCache.set(self, key, data)
                 self.clean()
 
-            self.set = set
+            self.set = set_
 
     @staticmethod
     def format_key(key: POSSIBLE_KEY) -> str:
@@ -89,7 +92,7 @@ class ExpireCache(Generic[T]):
                 self.set(key, result)
                 return result
 
-            return async_wrapper # type: ignore
+            return async_wrapper  # type: ignore
         else:
 
             @wraps(func)
@@ -117,16 +120,14 @@ class ExpireCache(Generic[T]):
                 "data": {k: self.serialize_data(v) for k, v in self.data.items()},
                 "key": self.key,
             }
-            with open(self.path, "wt", encoding="utf-8") as f:
+            with Path(self.path).open("w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
     def load_data(self) -> None:
-        if self.path and os.path.exists(self.path):
-            with open(self.path, "rt", encoding="utf-8") as f:
+        if self.path and Path(self.path).exists():
+            with Path(self.path).open("r", encoding="utf-8") as f:
                 data = json.load(f)
                 if not data:
                     return
                 self.key = data["key"]
-                self.data = {
-                    k: self.unserialize_data(v) for k, v in data["data"].items()
-                }
+                self.data = {k: self.unserialize_data(v) for k, v in data["data"].items()}

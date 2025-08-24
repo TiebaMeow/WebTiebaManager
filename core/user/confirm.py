@@ -1,11 +1,11 @@
 from pathlib import Path
-from pydantic import BaseModel
 from typing import Any
 
+from pydantic import BaseModel
 
+from core.constance import CONFIRM_EXPIRE, USER_DIR
 from core.typedef import Content
 from core.util.cache import ExpireCache
-from core.constance import USER_DIR, CONFIRM_EXPIRE
 
 
 class ConfirmData(BaseModel):

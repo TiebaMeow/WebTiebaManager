@@ -1,9 +1,9 @@
 from typing import Literal
 
 from core.process.typedef import ProcessObject
-from .rule import Rules, RuleTemplate
-from .template import TextRule, LimiterRule, CheckBoxRule
 
+from .rule import Rules, RuleTemplate
+from .template import CheckBoxRule, LimiterRule, TextRule
 
 content_register = Rules.fix_category("帖子")
 

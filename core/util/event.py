@@ -1,22 +1,22 @@
 import asyncio
-from typing import TypeVar, Generic, Callable, Awaitable, Any
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 
+@dataclass
 class EventListener:
-    def __init__(self, fn: Callable, un_register: Callable) -> None:
-        self.fn = fn
-        self.un_register = un_register
+    fn: Callable
+    un_register: Callable
 
 
 class AsyncEvent(Generic[T]):
     def __init__(self) -> None:
         self._listeners: list[Callable[[T], Awaitable[None]]] = []
 
-    def on(
-        self, fn: Callable[[T], Awaitable[None]] | Callable[[T], None] | EventListener
-    ):
+    def on(self, fn: Callable[[T], Awaitable[None]] | Callable[[T], None] | EventListener):
         if isinstance(fn, EventListener):
             fn = fn.fn
 

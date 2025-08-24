@@ -1,9 +1,9 @@
 from hashlib import md5
+
 from pydantic import BaseModel, Field
 
-
-from core.rule.rule_set import RuleSetConfig
 from core.constance import CONTENT_VALID_EXPIRE
+from core.rule.rule_set import RuleSetConfig
 from core.util.tools import uuid4
 
 

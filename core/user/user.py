@@ -1,19 +1,22 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
-from .config import UserConfig
+from core.config import write_config
+from core.constance import USER_DIR
+from core.control import Controller
 from core.process.process import Processer
 from core.process.typedef import ProcessObject
 from core.rule.operation import OperationGroup
-from core.typedef import Content
 from core.rule.rule_set import RuleSet
-from core.control import Controller
-from core.util.event import EventListener
-from core.constance import USER_DIR
-from .confirm import ConfirmCache, ConfirmData
+from core.typedef import Content
 from core.util.tools import int_time
-from core.config import write_config
+
+from .config import UserConfig
+from .confirm import ConfirmCache, ConfirmData
+
+if TYPE_CHECKING:
+    from core.util.event import EventListener
 
 
 class TiebaClientEmpty:
@@ -28,7 +31,6 @@ class TiebaClientEmpty:
 
 
 class TiebaClient:
-
     def __init__(self, bduss: str, stoken: str) -> None:
         self.bduss = bduss
         self.stoken = stoken
@@ -65,14 +67,10 @@ class TiebaClient:
         if content.type == "Thread":
             return await self.client.del_thread(content.fname, tid=content.tid)
         else:
-            return await self.client.del_post(
-                content.fname, tid=content.tid, pid=content.pid
-            )
+            return await self.client.del_post(content.fname, tid=content.tid, pid=content.pid)
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        return await self.client.block(
-            content.fname, content.user.user_id, day=day, reason=reason
-        )
+        return await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
 
 
 class User:
@@ -108,9 +106,7 @@ class User:
         self.config = config
         self.processer = Processer(config)
         if self.config.forum.login_ready:
-            self.client = await TiebaClient.create(
-                self.config.forum.bduss, self.config.forum.stoken
-            )
+            self.client = await TiebaClient.create(self.config.forum.bduss, self.config.forum.stoken)
             if isinstance(self.client, TiebaClientEmpty):
                 # TODO 在这里添加登录失败提示
                 pass
@@ -184,9 +180,7 @@ class User:
         else:
             await self.operate(obj, rule_set.operations)
 
-    async def operate_confirm(
-        self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]
-    ) -> bool:
+    async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         # TODO confirm日志显示
         if isinstance(confirm, str | int):
             if (_ := self.confirm.get(confirm)) is None:

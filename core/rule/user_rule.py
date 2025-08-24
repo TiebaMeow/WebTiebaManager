@@ -1,9 +1,10 @@
 from typing import Literal, TypedDict
 
 from core.process.typedef import ProcessObject
-from .rule import Rules
-from .template import TextRule, LimiterRule
 from core.tieba.info import TiebaInfo
+
+from .rule import Rules
+from .template import LimiterRule, TextRule
 
 user_register = Rules.fix_category("用户")
 

@@ -1,13 +1,11 @@
 import os
 from pathlib import Path
-from typing import TypeVar, Literal
+from typing import Literal, TypeVar
 
 import yaml
 from pydantic import BaseModel
 
 from .constance import BASE_DIR
-from pydantic import BaseModel
-
 from .tieba.config import ScanConfig
 
 T = TypeVar("T")
@@ -19,8 +17,8 @@ class Config(BaseModel):
 
 def read_config(path: Path, obj: type[T]) -> T:
     if path.exists():
-        with open(path, mode="rt", encoding="utf8") as f:
-            return obj.model_validate((yaml.safe_load(f) or {}))  # type: ignore
+        with path.open(encoding="utf8") as f:
+            return obj.model_validate(yaml.safe_load(f) or {})  # type: ignore
     else:
         return obj.model_validate({})  # type: ignore
 
@@ -31,5 +29,5 @@ config = read_config(CONFIG_PATH, Config)
 
 
 def write_config(config, path: os.PathLike = CONFIG_PATH):
-    with open(path, mode="wt", encoding="utf8") as f:
+    with Path(path).open(mode="w", encoding="utf8") as f:
         yaml.dump(config.model_dump(), f, allow_unicode=True, indent=2)

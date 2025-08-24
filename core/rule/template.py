@@ -1,6 +1,6 @@
-import re
 import abc
-from typing import TypeVar, Generic
+import re
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 
 class ContentRuleTemplate(abc.ABC):
-    _target_attribute: str|list[str]
+    _target_attribute: str | list[str]
 
     @abc.abstractmethod
     async def _raw_check(self, value) -> bool:
@@ -40,7 +40,7 @@ class TextOptions(BaseModel):
 
     def model_post_init(self, __context) -> None:
         if self.is_regex:
-            self._re = re.compile(self.text, flags=(re.I if self.ignore_case else 0))
+            self._re = re.compile(self.text, flags=(re.IGNORECASE if self.ignore_case else 0))
         else:
             self._text = self.text.lower() if self.ignore_case else self.text
 
