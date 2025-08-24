@@ -1,33 +1,36 @@
 """
 使用方法：
 
-from core.db import Database, Content, Life
+from core.typedef import Content
+from core.db import Database, ContentModel
 
-contents = [Content(**{"fid": i, "fname": f"test_{i}"}) for i in range(1, 4)]
-await Database.save_items(contents)
+contents: list[Content]
+content_models = [ContentModel.from_content(c) for c in contents]
+await Database.save_items(content_models)
 
-fids = [1, 2, 3]
-result = await Database.get_contents(fids)
+pids = [1, 2, 3]
+result = await Database.get_contents_by_pids(pids)
 """
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterable
 from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Literal, TypeVar
 from urllib.parse import quote_plus
 
 from pydantic import BaseModel, computed_field
 from sqlalchemy import delete, select, update
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from core.control import Controller
 
-from .models import Base, Content, Life
+from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
 
-ModelType = Content | Life
+ModelType = TypeVar("ModelType", ContentModel, ForumModel, LifeModel, UserModel)
 
 
 class DatabaseConfig(BaseModel, extra="ignore"):
-    type: str
+    type: Literal["sqlite", "postgresql", "mysql"]
     path: str | None = None
     username: str | None = None
     password: str | None = None
@@ -41,7 +44,8 @@ class DatabaseConfig(BaseModel, extra="ignore"):
         if self.type == "sqlite":
             if not self.path:
                 raise ValueError("SQLite database path is required")
-            return f"sqlite+aiosqlite:///{self.path}"
+            url_path = Path(self.path).resolve().as_posix()
+            return f"sqlite+aiosqlite:///{url_path}"
         if not all([self.username, self.password, self.host, self.port, self.db]):
             raise ValueError("Database configuration is incomplete")
         if self.type == "postgresql":
@@ -68,7 +72,10 @@ class Database:
     async def startup(cls, _: None = None) -> None:
         config = Controller.config
         database_config = DatabaseConfig.model_validate(config)
-        cls.engine = create_async_engine(database_config.database_url)
+        cls.engine = create_async_engine(
+            database_config.database_url,
+            pool_pre_ping=(database_config.type != "sqlite"),
+        )
         cls.sessionmaker = async_sessionmaker(cls.engine, class_=AsyncSession, expire_on_commit=False)
         async with cls.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -83,22 +90,28 @@ class Database:
         async with cls.sessionmaker() as session:
             try:
                 yield session
-            except SQLAlchemyError:
+            except Exception:
                 await session.rollback()
                 raise
             finally:
                 await session.close()
 
     @classmethod
-    async def save_items(cls, items: list[ModelType]) -> None:
+    async def save_items(cls, items: Iterable[ModelType]) -> None:
+        item_list = list(items)
+        if not item_list:
+            return
         async with cls.get_session() as session:
-            session.add_all(item for item in items)
+            session.add_all(item_list)
             await session.commit()
 
     @classmethod
-    async def get_contents(cls, fids: list[int]) -> list[Content]:
+    async def get_contents_by_pids(cls, pids: Iterable[int]) -> list[ContentModel]:
+        pid_list = list(pids)
+        if not pid_list:
+            return []
         async with cls.get_session() as session:
-            result = await session.execute(select(Content).where(Content.fid.in_(fids)))
+            result = await session.execute(select(ContentModel).where(ContentModel.pid.in_(pid_list)))
             return list(result.scalars().all())
 
 
