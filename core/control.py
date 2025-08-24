@@ -10,7 +10,9 @@ class Controller:
     DispatchContent = AsyncEvent[Content]()
 
     config = config
+    running: bool = False
 
     @classmethod
     async def start(cls):
+        cls.running = True
         await cls.Start.broadcast(None)

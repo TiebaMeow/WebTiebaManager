@@ -2,9 +2,9 @@ from typing import TypedDict
 
 import aiotieba
 
-from core.util.cache import ExpireCache
 from core.control import Controller
 from core.process.typedef import ProcessObject
+from core.util.cache import ExpireCache
 
 
 class UserInfoDict(TypedDict):
@@ -12,7 +12,7 @@ class UserInfoDict(TypedDict):
 
 
 class TiebaInfo:
-    client: aiotieba.Client | None
+    client: aiotieba.Client | None = None
     user_info_cache = ExpireCache[aiotieba.typing.UserInfo]()
 
     @classmethod

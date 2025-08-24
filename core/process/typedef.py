@@ -1,7 +1,6 @@
-from typing import TypeVar, Generic, Any
+from typing import Generic, TypeVar
 
 from ..typedef import Content
-
 
 T = TypeVar("T")
 

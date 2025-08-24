@@ -1,13 +1,13 @@
-import time
-import json
 import hashlib
+import json
+import time
 import traceback
-from typing import TypedDict, Literal
+from typing import Literal, TypedDict
 
 import aiohttp
 from pydantic import BaseModel
 
-from core.typedef import Post, Comment, User, Image
+from core.typedef import Comment, Image, Post, User
 from core.util.tools import timestring
 
 
@@ -180,7 +180,6 @@ class TiebaBrowser:
                 **kwargs,
             )
             if res.status != 200:
-                print(res.text)
                 return GetPostData()
 
             data: GetPostsResponse = json.loads(await res.text())
@@ -206,7 +205,7 @@ class TiebaBrowser:
                 text = ""
                 images = []
 
-                for c in post["content"]:
+                for c in post.get("content", []):
                     if c["type"] == 0:
                         text += c["text"]
                     elif c["type"] == 3:

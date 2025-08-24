@@ -3,13 +3,14 @@ import asyncio
 import aiotieba
 from pydantic import BaseModel
 
-from core.util.cache import ExpireCache
 from core.constance import BASE_DIR, PID_CACHE_EXPIRE
-from core.util.tools import EtaSleep
-from .browser import TiebaBrowser
-from core.typedef import Thread, Post, Comment
 from core.control import Controller
+from core.typedef import Comment, Post, Thread
 from core.user.manager import UserManager
+from core.util.cache import ExpireCache
+from core.util.tools import EtaSleep
+
+from .browser import TiebaBrowser
 
 
 class CrawlNeed(BaseModel):
@@ -27,9 +28,7 @@ class CrawlNeed(BaseModel):
 
 class Crawler:
     CACHE_FILE = BASE_DIR / "pid_cache.json"
-    cache: ExpireCache[int | str] = ExpireCache(
-        expire=PID_CACHE_EXPIRE, path=CACHE_FILE
-    )
+    cache: ExpireCache[int | str] = ExpireCache(expire=PID_CACHE_EXPIRE, path=CACHE_FILE)
     cache.load_data()
 
     client: aiotieba.Client
@@ -42,6 +41,8 @@ class Crawler:
     def __init__(self):
         self.update_config(None)
         Controller.MainConfigChange.on(self.update_config)
+        self.client = None  # type: ignore
+        self.browser = None  # type: ignore
 
     def update_config(self, _: None):
         self.eta = EtaSleep(Controller.config.scan.query_cd)
@@ -138,15 +139,11 @@ class Crawler:
                     self.cache.set(post.pid, reply_num)
                     continue
 
-                target_pn = (
-                    reply_num // 30 + 1 if reply_num % 30 != 0 else reply_num // 30
-                )
+                target_pn = reply_num // 30 + 1 if reply_num % 30 != 0 else reply_num // 30
                 async with self.eta:
                     raw_comments.extend(
                         Comment.from_aiotieba_data(i)
-                        for i in await self.client.get_comments(
-                            post.tid, post.pid, pn=target_pn
-                        )
+                        for i in await self.client.get_comments(post.tid, post.pid, pn=target_pn)
                     )
 
                 self.cache.set(post.pid, reply_num)
@@ -176,10 +173,8 @@ class CrawlerManager:
         for user in UserManager.users.values():
             forum = user.config.forum
 
-            if user.config.enable:
-                need = CrawlNeed(
-                    thread=forum.thread, post=forum.post, comment=forum.comment
-                )
+            if user.config.enable and forum and user.config.rule_sets:
+                need = CrawlNeed(thread=forum.thread, post=forum.post, comment=forum.comment)
                 if forum.forum in new_needs:
                     new_needs[forum.forum] += need
                 else:
@@ -190,9 +185,9 @@ class CrawlerManager:
 
     @classmethod
     async def start_or_stop(cls):
-        if cls.needs and not cls.task:
+        if cls.needs and not cls.task and Controller.running:
             cls.task = asyncio.create_task(cls.crawl())
-        if not cls.needs and cls.task:
+        if (not cls.needs or not Controller.running) and cls.task:
             cls.task.cancel()
             cls.task = None
 
@@ -204,9 +199,16 @@ class CrawlerManager:
 
     @classmethod
     async def crawl(cls):
-        for forum, need in cls.needs.items():
-            async for content in cls.crawler.crawl(forum, need):
-                await Controller.DispatchContent.broadcast(content)
+        try:
+            while True:
+                for forum, need in cls.needs.items():
+                    async for content in cls.crawler.crawl(forum, need):
+                        await Controller.DispatchContent.broadcast(content)
+                await asyncio.sleep(Controller.config.scan.loop_cd)
+        except Exception:
+            from traceback import format_exc
+
+            print(format_exc())
 
     @classmethod
     async def start(cls):

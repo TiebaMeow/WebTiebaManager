@@ -30,6 +30,6 @@ CONFIG_PATH = BASE_DIR / "config.yaml"
 config = read_config(CONFIG_PATH, Config)
 
 
-def write_config(config: Config, path: os.PathLike = CONFIG_PATH):
+def write_config(config, path: os.PathLike = CONFIG_PATH):
     with open(path, mode="wt", encoding="utf8") as f:
         yaml.dump(config.model_dump(), f, allow_unicode=True, indent=2)

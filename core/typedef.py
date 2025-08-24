@@ -87,6 +87,21 @@ class BaseContent(BaseModel):
     floor: int
     user: User
 
+    @property
+    def mark(self):
+        _type:Literal["Thread",'Post','Comment'] = self.type # type: ignore
+
+        if _type == 'Thread':
+            return self.title
+        elif _type == 'Post':
+            return f'{self.title} {self.floor}楼'
+        else:
+            return f'{self.title} {self.floor}楼 楼中楼'
+    
+    @property
+    def link(self):
+        return f'https://tieba.baidu.com/p/{self.tid}' + ('' if self.type == 'Thread' else f'?{self.pid}#{self.pid}') # type: ignore
+
 
 class Thread(BaseContent, ContentInterface):
     floor: int = 1

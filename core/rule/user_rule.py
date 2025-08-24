@@ -23,13 +23,13 @@ class NickNameRule(TextRule):
 @user_register("Portrait")
 class PortraitRule(TextRule):
     type: Literal["Portrait"] = "Portrait"
-    _target_attribute: str | list[str] = ["uesr", "portrait"]
+    _target_attribute: str | list[str] = ["user", "portrait"]
 
 
 @user_register("等级")
 class LevelRule(LimiterRule):
     type: Literal["Level"] = "Level"
-    _target_attribute: str | list[str] = ["uesr", "level"]
+    _target_attribute: str | list[str] = ["user", "level"]
 
 
 @user_register("IP")
