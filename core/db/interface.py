@@ -1,57 +1,119 @@
 """
-配置获取方法
+使用方法：
 
-from core.control import Controller
-config = Controller.config
+from core.typedef import Content
+from core.db import Database, ContentModel
 
-异步初始化/结束方法
+contents: list[Content]
+content_models = [ContentModel.from_content(c) for c in contents]
+await Database.save_items(content_models)
 
-Controller.Start.on(async_start_function) < 在开始服务前调用
-Controller.Stop.on(async_stop_function) < 结束服务后调用
-
-最终需要呈现的效果
-
-from core.db import DBConn (db可以为文件夹)
-
-async with DBConn() as c:
-    result = await c.execute("xxx",(a,b,c))
-
-NOTE
-需求大概是这样，如果有更好的idea也可以
+pids = [1, 2, 3]
+result = await Database.get_contents_by_pids(pids)
 """
 
-# 配置格式
-# 会有以下两种格式的配置传入
+from collections.abc import AsyncGenerator, Iterable
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Literal, TypeVar
+from urllib.parse import quote_plus
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from core.control import Controller
 
-class SqliteConfig(BaseModel):
-    path: str
-    username: str
-    password: str
+from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
 
-
-class PostgresqlConfig(BaseModel):
-    host: str
-    port: int
-    username: str
-    password: str
-    db: str
+ModelType = TypeVar("ModelType", ContentModel, ForumModel, LifeModel, UserModel)
 
 
-DatabaseConfig = SqliteConfig | PostgresqlConfig
+class DatabaseConfig(BaseModel, extra="ignore"):
+    type: Literal["sqlite", "postgresql", "mysql"]
+    path: str | None = None
+    username: str | None = None
+    password: str | None = None
+    host: str | None = None
+    port: int | None = None
+    db: str | None = None
 
-# 调用方法
-# DBConn实际上可以为函数，返回SqliteDBConn/PostgresqlDBConn等
-# 建议使用连接池*
+    @computed_field
+    @property
+    def database_url(self) -> str:
+        if self.type == "sqlite":
+            if not self.path:
+                raise ValueError("SQLite database path is required")
+            url_path = Path(self.path).resolve().as_posix()
+            return f"sqlite+aiosqlite:///{url_path}"
+        if not all([self.username, self.password, self.host, self.port, self.db]):
+            raise ValueError("Database configuration is incomplete")
+        if self.type == "postgresql":
+            return (
+                f"postgresql+asyncpg://"
+                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
+                f"@{self.host}:{self.port}/{self.db}"
+            )
+        elif self.type == "mysql":
+            return (
+                f"mysql+asyncmy://"
+                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
+                f"@{self.host}:{self.port}/{self.db}"
+            )
+        else:
+            raise ValueError("Unsupported database type")
 
-class DBConn(object):
-    def __init__(self): ...
 
-    # 一系列封装的方法, 可以拓展共同项
-    async def execute(self, sql, params=None): ...
+class Database:
+    engine: AsyncEngine
+    sessionmaker: async_sessionmaker[AsyncSession]
 
-    async def fetch_one(self, sql, params=None): ...
+    @classmethod
+    async def startup(cls, _: None = None) -> None:
+        config = Controller.config
+        database_config = DatabaseConfig.model_validate(config)
+        cls.engine = create_async_engine(
+            database_config.database_url,
+            pool_pre_ping=(database_config.type != "sqlite"),
+        )
+        cls.sessionmaker = async_sessionmaker(cls.engine, class_=AsyncSession, expire_on_commit=False)
+        async with cls.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    async def fetch_all(self, sql, params=None): ...
+    @classmethod
+    async def teardown(cls, _: None = None) -> None:
+        await cls.engine.dispose()
+
+    @classmethod
+    @asynccontextmanager
+    async def get_session(cls) -> AsyncGenerator[AsyncSession, None]:
+        async with cls.sessionmaker() as session:
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+    @classmethod
+    async def save_items(cls, items: Iterable[ModelType]) -> None:
+        item_list = list(items)
+        if not item_list:
+            return
+        async with cls.get_session() as session:
+            session.add_all(item_list)
+            await session.commit()
+
+    @classmethod
+    async def get_contents_by_pids(cls, pids: Iterable[int]) -> list[ContentModel]:
+        pid_list = list(pids)
+        if not pid_list:
+            return []
+        async with cls.get_session() as session:
+            result = await session.execute(select(ContentModel).where(ContentModel.pid.in_(pid_list)))
+            return list(result.scalars().all())
+
+
+Controller.Start.on(Database.startup)
+Controller.Stop.on(Database.teardown)
