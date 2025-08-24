@@ -1,2 +1,2 @@
 from .interface import Database
-from .models import Content, Life
+from .models import ContentModel, ForumModel, LifeModel, UserModel
