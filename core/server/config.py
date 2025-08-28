@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from core.util.tools import int_time, random_secret
 
 
-class ServerConfig(BaseModel):
+class ServerConfig(BaseModel, extra="ignore"):
     host: str = "0.0.0.0"
     port: int = 36800
     key: str

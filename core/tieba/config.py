@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class ScanConfig(BaseModel):
+class ScanConfig(BaseModel, extra="ignore"):
     loop_cd: int = 10
     query_cd: float = 0.05
     pc_query_cd: float = 2
