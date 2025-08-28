@@ -32,7 +32,7 @@ class EtaSleep:
         self.eta = 0
 
     def refresh(self):
-        self.eta = time.time() + self.cd
+        self.eta = time.monotonic() + self.cd
 
     async def sleep_async(self):
         if self.remaining > 0:
@@ -44,7 +44,7 @@ class EtaSleep:
 
     @property
     def remaining(self):
-        return max(0, self.eta - time.time())
+        return max(0, self.eta - time.monotonic())
 
     async def __aenter__(self):
         await self.sleep_async()
@@ -103,11 +103,11 @@ class Timer:
         return self.costs[-1] if self.costs else 0
 
     def __enter__(self):
-        self.start_time = time.time()
+        self.start_time = time.monotonic()
         return self
 
     def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
-        self.costs.append(time.time() - self.start_time)
+        self.costs.append(time.monotonic() - self.start_time)
 
 
 def random_secret(length=32):

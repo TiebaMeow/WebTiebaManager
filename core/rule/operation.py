@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, TypeAdapter
@@ -34,7 +36,7 @@ class OperationGroup:
             return [i.serialize() for i in self.operations]
 
     @property
-    def direct_operations(self) -> "OperationGroup | None":
+    def direct_operations(self) -> OperationGroup | None:
         if isinstance(self.operations, str):
             return None
         else:
@@ -44,7 +46,7 @@ class OperationGroup:
             return OperationGroup(operations=operataions)
 
     @property
-    def no_direct_operations(self) -> "OperationGroup | None":
+    def no_direct_operations(self) -> OperationGroup | None:
         if isinstance(self.operations, str):
             return OperationGroup(self.operations)  # type: ignore
         else:

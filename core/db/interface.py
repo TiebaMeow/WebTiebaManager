@@ -15,7 +15,7 @@ result = await Database.get_contents_by_pids(pids)
 from collections.abc import AsyncGenerator, Iterable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Literal
 from urllib.parse import quote_plus
 
 from pydantic import BaseModel, computed_field
@@ -25,8 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from core.control import Controller
 
 from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
-
-ModelType = TypeVar("ModelType", ContentModel, ForumModel, LifeModel, UserModel)
 
 
 class DatabaseConfig(BaseModel, extra="ignore"):
@@ -97,7 +95,7 @@ class Database:
                 await session.close()
 
     @classmethod
-    async def save_items(cls, items: Iterable[ModelType]) -> None:
+    async def save_items[T: (ContentModel, ForumModel, LifeModel, UserModel)](cls, items: Iterable[T]) -> None:
         item_list = list(items)
         if not item_list:
             return

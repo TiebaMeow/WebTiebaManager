@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import TypeVar
 
 import toml
 from pydantic import BaseModel
@@ -9,15 +8,13 @@ from .constance import BASE_DIR
 from .server.config import ServerConfig, random_secret
 from .tieba.config import ScanConfig
 
-T = TypeVar("T")
-
 
 class SystemConfig(BaseModel):
     scan: ScanConfig = ScanConfig()
     server: ServerConfig = ServerConfig(key=random_secret())
 
 
-def read_config(path: Path, obj: type[T]) -> T:
+def read_config[T](path: Path, obj: type[T]) -> T:
     if path.exists():
         with path.open(encoding="utf8") as f:
             return obj.model_validate(toml.load(f) or {})  # type: ignore
