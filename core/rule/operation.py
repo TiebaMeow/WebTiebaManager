@@ -40,10 +40,10 @@ class OperationGroup:
         if isinstance(self.operations, str):
             return None
         else:
-            operataions = [i for i in self.operations if i.direct]
-            if not operataions:
+            operations = [i for i in self.operations if i.direct]
+            if not operations:
                 return None
-            return OperationGroup(operations=operataions)
+            return OperationGroup(operations=operations)
 
     @property
     def no_direct_operations(self) -> OperationGroup | None:
