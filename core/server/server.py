@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import CONFIG_PATH
 from core.constance import USER_DIR
 from core.control import Controller
+from core.user.manager import UserManager
 
 HTTP_ALLOW_ORIGINS = ["*"]
 
@@ -17,16 +18,17 @@ class Server:
     server: uvicorn.Server | None = None
 
     @classmethod
-    def need_system(cls):
+    async def need_system(cls):
         return not CONFIG_PATH.exists()
 
     @classmethod
-    def need_user(cls):
-        return not bool([i for i in USER_DIR.iterdir() if i.is_dir()])
+    async def need_user(cls):
+        await UserManager.silent_load_users()
+        return not UserManager.users
 
     @classmethod
-    def need_initialize(cls):
-        return cls.need_system() or cls.need_user()
+    async def need_initialize(cls):
+        return await cls.need_system() or await cls.need_user()
 
     @classmethod
     async def serve(cls):
@@ -51,7 +53,7 @@ class Server:
                 )
             )
             cls.server = server
-            if cls.need_initialize():
+            if await cls.need_initialize():
                 print("server start at http://0.0.0.0:36799")
             else:
                 await Controller.start()

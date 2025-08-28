@@ -28,12 +28,12 @@ class InitializeRequest(BaseModel):
 
 @app.get("/api/initialize/get_info", tags=["initialize"])
 async def get_initialize_info():
-    return {"code": 200, "data": {"need_user": Server.need_user(), "need_system": Server.need_system()}}
+    return {"code": 200, "data": {"need_user": await Server.need_user(), "need_system": await Server.need_system()}}
 
 
 @app.post("/api/initialize/initialize", tags=["initialize"])
 async def initialize_post(request: InitializeRequest):
-    if not Server.need_initialize():
+    if not await Server.need_initialize():
         raise HTTPException(status_code=400, detail="系统已经初始化")
 
     if Server.need_user():

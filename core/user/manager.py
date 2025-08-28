@@ -15,7 +15,11 @@ class UserManager:
     UserChange = AsyncEvent[None]()
 
     @classmethod
-    async def load_users(cls, _: None = None):
+    async def silent_load_users(cls):
+        for user in cls.users.values():
+            await user.stop()
+
+        cls.users.clear()
         for user_dir in USER_DIR.iterdir():
             if not user_dir.is_dir():
                 continue
@@ -30,6 +34,9 @@ class UserManager:
 
             cls.users[user_config.user.username] = await User.create(user_config)
 
+    @classmethod
+    async def load_users(cls, _: None = None):
+        await cls.silent_load_users()
         await cls.UserChange.broadcast(None)
 
     @classmethod
