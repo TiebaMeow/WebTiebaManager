@@ -36,5 +36,4 @@ class AsyncEvent(Generic[T]):
         return EventListener(fn, un_register)
 
     async def broadcast(self, data: T):
-        for listener in self._listeners:
-            await listener(data)
+        await asyncio.gather(*(i(data) for i in self._listeners))

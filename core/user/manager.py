@@ -20,7 +20,7 @@ class UserManager:
             if not user_dir.is_dir():
                 continue
 
-            user_config_path = user_dir / "config.yaml"
+            user_config_path = user_dir / "config.toml"
             if not user_config_path.exists():
                 raise Exception(f"User config file not found for user {user_dir.stem}")
 
@@ -33,14 +33,18 @@ class UserManager:
         await cls.UserChange.broadcast(None)
 
     @classmethod
-    async def new_user(cls, config: UserConfig):
+    async def new_user(cls, config: UserConfig, force: bool = False):
         if config.user.username in cls.users:
-            raise ValueError(f"User {config.user.username} already exists")
+            if force:
+                shutil.rmtree(cls.users[config.user.username].dir)
+                cls.users.pop(config.user.username)
+            else:
+                raise ValueError(f"User {config.user.username} already exists")
 
         user = await User.create(config)
         cls.users[config.user.username] = user
 
-        write_config(config, user.dir / "config.yaml")
+        write_config(config, user.dir / "config.toml")
 
     @classmethod
     async def delete_user(cls, username: str):
@@ -58,6 +62,10 @@ class UserManager:
             raise ValueError(f"User {config.user.username} does not exist")
 
         await cls.users[config.user.username].update_config(config)
+
+    @classmethod
+    def get_user(cls, username: str):
+        return cls.users.get(username)
 
 
 Controller.Start.on(UserManager.load_users)

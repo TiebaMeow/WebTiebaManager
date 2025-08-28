@@ -1,26 +1,15 @@
-from hashlib import md5
-
 from pydantic import BaseModel, Field
 
 from core.constance import CONTENT_VALID_EXPIRE
 from core.rule.rule_set import RuleSetConfig
-from core.util.tools import uuid4
+from core.util.tools import int_time
 
 
 class UserInfo(BaseModel):
     username: str
     password: str
-    token: str
-    admin: bool = False
-    secret: str = Field(default_factory=lambda: UserInfo.random_secret())
-
-    @staticmethod
-    def random_secret():
-        """
-        :return:
-        长度为6的str字符
-        """
-        return md5(uuid4().encode("utf8")).hexdigest()[:6]
+    token: str = ""
+    password_last_update: int = Field(default_factory=int_time)
 
 
 class ProcessConfig(BaseModel):

@@ -1,33 +1,35 @@
 import os
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import TypeVar
 
-import yaml
+import toml
 from pydantic import BaseModel
 
 from .constance import BASE_DIR
+from .server.config import ServerConfig, random_secret
 from .tieba.config import ScanConfig
 
 T = TypeVar("T")
 
 
-class Config(BaseModel):
+class SystemConfig(BaseModel):
     scan: ScanConfig = ScanConfig()
+    server: ServerConfig = ServerConfig(key=random_secret())
 
 
 def read_config(path: Path, obj: type[T]) -> T:
     if path.exists():
         with path.open(encoding="utf8") as f:
-            return obj.model_validate(yaml.safe_load(f) or {})  # type: ignore
+            return obj.model_validate(toml.load(f) or {})  # type: ignore
     else:
         return obj.model_validate({})  # type: ignore
 
 
-CONFIG_PATH = BASE_DIR / "config.yaml"
+CONFIG_PATH = BASE_DIR / "config.toml"
 
-config = read_config(CONFIG_PATH, Config)
+system_config = read_config(CONFIG_PATH, SystemConfig)
 
 
 def write_config(config, path: os.PathLike = CONFIG_PATH):
     with Path(path).open(mode="w", encoding="utf8") as f:
-        yaml.dump(config.model_dump(), f, allow_unicode=True, indent=2)
+        toml.dump(config.model_dump(), f)

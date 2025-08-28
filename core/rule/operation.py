@@ -24,7 +24,6 @@ OPERATION_TYPE = STR_OPERATION | list[OperationTemplate]
 
 
 class OperationGroup:
-
     def __init__(self, operations: OPERATION_TYPE) -> None:
         self.operations = operations
 
@@ -35,7 +34,7 @@ class OperationGroup:
             return [i.serialize() for i in self.operations]
 
     @property
-    def direct_opertions(self) -> "OperationGroup | None":
+    def direct_operations(self) -> "OperationGroup | None":
         if isinstance(self.operations, str):
             return None
         else:

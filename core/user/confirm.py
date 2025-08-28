@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from core.constance import CONFIRM_EXPIRE, USER_DIR
+from core.constance import CONFIRM_EXPIRE
 from core.typedef import Content
 from core.util.cache import ExpireCache
 
@@ -17,9 +17,7 @@ class ConfirmData(BaseModel):
 
 
 class ConfirmCache(ExpireCache[ConfirmData]):
-    def __init__(
-        self, user_dir: Path, expire: int = CONFIRM_EXPIRE, clear_after_set: bool = True
-    ):
+    def __init__(self, user_dir: Path, expire: int = CONFIRM_EXPIRE, clear_after_set: bool = True):
         path = user_dir / "confirm_cache.json"
         super().__init__(expire, clear_after_set, path)
         self.load_data()

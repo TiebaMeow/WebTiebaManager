@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
-from core.config import write_config
 from core.constance import USER_DIR
 from core.control import Controller
 from core.process.process import Processer
@@ -103,6 +102,7 @@ class User:
             await self.client.stop()
 
     async def update_config(self, config: UserConfig):
+        # TODO 判断输入的bduss, stoken是否有效（是否被马赛克）
         self.config = config
         self.processer = Processer(config)
         if self.config.forum.login_ready:
@@ -161,7 +161,7 @@ class User:
         执行规则集的直接操作
         """
         if self.config.process.mandatory_confirm or rule_set.manual_confirm:
-            if og := rule_set.operations.direct_opertions:
+            if og := rule_set.operations.direct_operations:
                 await self.operate(obj, og)
 
             og = rule_set.operations.no_direct_operations
@@ -182,7 +182,7 @@ class User:
 
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         # TODO confirm日志显示
-        if isinstance(confirm, str | int):
+        if isinstance(confirm, (str, int)):
             if (_ := self.confirm.get(confirm)) is None:
                 return False
 

@@ -40,7 +40,7 @@ class Crawler:
 
     def __init__(self):
         self.update_config(None)
-        Controller.MainConfigChange.on(self.update_config)
+        Controller.SystemConfigChange.on(self.update_config)
         self.client = None  # type: ignore
         self.browser = None  # type: ignore
 
@@ -109,7 +109,7 @@ class Crawler:
                         async with self.eta:
                             await get_posts(i)
                 else:
-                    for i in (2, scan.post_page_forward + 1):
+                    for i in range(2, scan.post_page_forward + 1):
                         async with self.eta:
                             await get_posts(i)
                     for i in range(
@@ -159,7 +159,7 @@ class Crawler:
         self.cache.save_data()
 
     @classmethod
-    def delete_cacche(cls):
+    def delete_cache(cls):
         cls.CACHE_FILE.unlink(missing_ok=True)
 
 
@@ -219,4 +219,4 @@ class CrawlerManager:
 
 UserManager.UserChange.on(CrawlerManager.update_needs)
 UserManager.UserConfigChange.on(CrawlerManager.update_needs)
-Controller.MainConfigChange.on(CrawlerManager.restart)
+Controller.SystemConfigChange.on(CrawlerManager.restart)

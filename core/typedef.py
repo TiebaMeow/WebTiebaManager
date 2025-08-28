@@ -100,7 +100,9 @@ class BaseContent(BaseModel):
 
     @property
     def link(self):
-        return f"https://tieba.baidu.com/p/{self.tid}" + ("" if self.type == "Thread" else f"?{self.pid}#{self.pid}")  # type: ignore
+        return f"https://tieba.baidu.com/p/{self.tid}" + (
+            "" if self.type == "Thread" else f"?pid={self.pid}#{self.pid}"  # type: ignore
+        )
 
 
 class Thread(BaseContent, ContentInterface):

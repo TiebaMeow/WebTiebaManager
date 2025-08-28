@@ -1,5 +1,6 @@
 import asyncio
 import platform
+import secrets
 import sys
 import time
 import uuid
@@ -107,3 +108,7 @@ class Timer:
 
     def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
         self.costs.append(time.time() - self.start_time)
+
+
+def random_secret(length=32):
+    return secrets.token_hex(length)
