@@ -3,7 +3,7 @@ name = "web-tieba-manager"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "aiofiles>=24.1.0",
     "aiosqlite>=0.21.0",
@@ -17,7 +17,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "pyyaml>=6.0.2",
     "sqlalchemy>=2.0.43",
-    "toml>=0.10.2",
+    "tomlkit>=0.13.3",
     "tzdata>=2025.2",
     "uvicorn>=0.35.0",
 ]

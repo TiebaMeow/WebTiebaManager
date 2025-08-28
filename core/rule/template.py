@@ -1,14 +1,11 @@
 import abc
 import re
-from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
 from core.process.typedef import ProcessObject
 
 from .rule import RuleTemplate
-
-T = TypeVar("T")
 
 
 class ContentRuleTemplate(abc.ABC):
@@ -92,7 +89,7 @@ class LimiterRule(ContentRuleTemplate, RuleTemplate):
         return True
 
 
-class CheckBoxOptions(BaseModel, Generic[T]):
+class CheckBoxOptions[T](BaseModel):
     value: list[T]
 
     @property
@@ -103,14 +100,14 @@ class CheckBoxOptions(BaseModel, Generic[T]):
         self._set = set(getattr(self, "value", []))
 
 
-class CheckBoxRule(ContentRuleTemplate, RuleTemplate, Generic[T]):
+class CheckBoxRule[T](ContentRuleTemplate, RuleTemplate):
     options: CheckBoxOptions[T]
 
     async def _raw_check(self, value: T) -> bool:
         return value in self.options._set
 
 
-class SelectOption(BaseModel, Generic[T]):
+class SelectOption[T](BaseModel):
     value: T
 
     @property
@@ -118,7 +115,7 @@ class SelectOption(BaseModel, Generic[T]):
         return bool(self.value)
 
 
-class SelectRule(ContentRuleTemplate, RuleTemplate, Generic[T]):
+class SelectRule[T](ContentRuleTemplate, RuleTemplate):
     options: SelectOption[T]
 
     async def _raw_check(self, value: T) -> bool:

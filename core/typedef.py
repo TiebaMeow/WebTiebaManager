@@ -1,10 +1,14 @@
-from abc import ABC, abstractmethod
-from typing import Literal
+from __future__ import annotations
 
-import aiotieba.typing
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Literal
+
 from aiotieba.api.get_posts._classdef import FragImage_p
 from aiotieba.api.get_threads._classdef import FragImage_t
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    import aiotieba.typing
 
 
 class User(BaseModel):
@@ -61,7 +65,7 @@ class ContentInterface(ABC):
 
     @classmethod
     @abstractmethod
-    def from_aiotieba_data(cls, data) -> "ContentInterface":
+    def from_aiotieba_data(cls, data) -> ContentInterface:
         """
         Convert data to CommonStructure
         """

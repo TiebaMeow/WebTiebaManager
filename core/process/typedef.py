@@ -1,11 +1,7 @@
-from typing import Generic, TypeVar
-
 from ..typedef import Content
 
-T = TypeVar("T")
 
-
-class ProcessObject(Generic[T]):
+class ProcessObject[T]:
     content: Content
     data: T  # 处理过程中附加的数据
 

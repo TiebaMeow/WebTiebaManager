@@ -5,12 +5,9 @@ import time
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 
 
-class ExpireCache(Generic[T]):
+class ExpireCache[T]:
     """
     注意：虽然key可以为多种类型，但实际储存时仍为str（json限制）
     这可能导致意外的key重复，如 '123'(str) 与 123(int)，请只使用同一类型的key
@@ -44,12 +41,12 @@ class ExpireCache(Generic[T]):
     def set(self, key: POSSIBLE_KEY, data: T):
         key = self.format_key(key)
         self.data[key] = data
-        self.key[key] = time.time()
+        self.key[key] = time.monotonic()
 
     def get(self, key: POSSIBLE_KEY) -> T | None:
         key = self.format_key(key)
         if key in self.data:
-            if time.time() - self.key[key] > self.expire:
+            if time.monotonic() - self.key[key] > self.expire:
                 self.data.pop(key)
                 self.key.pop(key)
             else:
@@ -66,7 +63,7 @@ class ExpireCache(Generic[T]):
 
     def clean(self) -> int:
         cleaned = 0
-        now = time.time()
+        now = time.monotonic()
 
         for key, create_time in self.key.copy().items():
             if now - create_time > self.expire:

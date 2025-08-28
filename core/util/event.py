@@ -1,9 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 
 
 @dataclass
@@ -12,7 +9,7 @@ class EventListener:
     un_register: Callable
 
 
-class AsyncEvent(Generic[T]):
+class AsyncEvent[T]:
     def __init__(self) -> None:
         self._listeners: list[Callable[[T], Awaitable[None]]] = []
 
