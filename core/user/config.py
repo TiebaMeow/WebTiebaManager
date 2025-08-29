@@ -30,7 +30,7 @@ class ForumConfig(BaseModel):
 
     @property
     def login_ready(self):
-        return self.bduss and self.stoken
+        return bool(self.bduss and self.stoken)
 
 
 class UserConfig(BaseModel):
