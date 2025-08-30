@@ -16,10 +16,8 @@ class UserManager:
 
     @classmethod
     async def silent_load_users(cls):
-        for user in cls.users.values():
-            await user.stop()
+        await cls.clear_users()
 
-        cls.users.clear()
         for user_dir in USER_DIR.iterdir():
             if not user_dir.is_dir():
                 continue
@@ -38,6 +36,13 @@ class UserManager:
     async def load_users(cls, _: None = None):
         await cls.silent_load_users()
         await cls.UserChange.broadcast(None)
+
+    @classmethod
+    async def clear_users(cls, _: None = None):
+        for user in cls.users.values():
+            await user.stop()
+
+        cls.users.clear()
 
     @classmethod
     async def new_user(cls, config: UserConfig, force: bool = False):
@@ -76,3 +81,4 @@ class UserManager:
 
 
 Controller.Start.on(UserManager.load_users)
+Controller.Stop.on(UserManager.clear_users)

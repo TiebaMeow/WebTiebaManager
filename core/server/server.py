@@ -43,7 +43,7 @@ class Server:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
             server = uvicorn.Server(
                 uvicorn.Config(app, host="0.0.0.0", port=36799, log_level="error", access_log=False)
-                if cls.need_system()
+                if await cls.need_system()
                 else uvicorn.Config(
                     app,
                     host=Controller.config.server.host,
@@ -66,5 +66,15 @@ class Server:
 
     @classmethod
     async def shutdown(cls):
+        await Controller.stop()
         if cls.server:
             cls.server.should_exit = True
+
+    @classmethod
+    def run(cls):
+        import asyncio
+
+        from . import initialize, token
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(cls.serve())

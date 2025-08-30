@@ -186,7 +186,7 @@ class CrawlerManager:
         await cls.start_or_stop()
 
     @classmethod
-    async def start_or_stop(cls):
+    async def start_or_stop(cls, _: None = None):
         if cls.needs and not cls.task and Controller.running:
             cls.task = asyncio.create_task(cls.crawl())
         if (not cls.needs or not Controller.running) and cls.task:
@@ -220,3 +220,4 @@ class CrawlerManager:
 UserManager.UserChange.on(CrawlerManager.update_needs)
 UserManager.UserConfigChange.on(CrawlerManager.update_needs)
 Controller.SystemConfigChange.on(CrawlerManager.restart)
+Controller.Stop.on(CrawlerManager.start_or_stop)
