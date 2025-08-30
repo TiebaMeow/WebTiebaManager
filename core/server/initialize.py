@@ -6,7 +6,7 @@ from core.control import Controller
 from core.user.config import UserConfig, UserInfo
 from core.user.manager import UserManager
 
-from .server import Server, app
+from .server import BaseResponse, Server, app
 
 
 class UserRequest(BaseModel):
@@ -26,13 +26,20 @@ class InitializeRequest(BaseModel):
     system: SystemRequest | None = None
 
 
+class GetInitializeInfoData(BaseModel):
+    need_user: bool
+    need_system: bool
+
+
 @app.get("/api/initialize/get_info", tags=["initialize"])
-async def get_initialize_info():
-    return {"code": 200, "data": {"need_user": await Server.need_user(), "need_system": await Server.need_system()}}
+async def get_initialize_info() -> BaseResponse[GetInitializeInfoData]:
+    return BaseResponse(
+        code=200, data=GetInitializeInfoData(need_system=await Server.need_system(), need_user=await Server.need_user())
+    )
 
 
 @app.post("/api/initialize/initialize", tags=["initialize"])
-async def initialize_post(request: InitializeRequest):
+async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
     if not await Server.need_initialize():
         raise HTTPException(status_code=400, detail="系统已经初始化")
 
@@ -51,4 +58,4 @@ async def initialize_post(request: InitializeRequest):
 
     Server.need_restart = True
     await Server.shutdown()
-    return {"code": 200}
+    return BaseResponse(code=200, data=None)

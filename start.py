@@ -1,3 +1,4 @@
 from core.server import Server
 
-Server.run()
+if __name__ == "__main__":
+    Server.run()

@@ -1,16 +1,31 @@
+import sys
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from core.config import CONFIG_PATH
-from core.constance import USER_DIR
 from core.control import Controller
 from core.user.manager import UserManager
 
 HTTP_ALLOW_ORIGINS = ["*"]
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await Controller.start()
+    yield
+    await Controller.stop()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+class BaseResponse[T](BaseModel):
+    code: int
+    data: T
 
 
 class Server:
@@ -53,10 +68,10 @@ class Server:
                 )
             )
             cls.server = server
+
             if await cls.need_initialize():
                 print("server start at http://0.0.0.0:36799")
             else:
-                await Controller.start()
                 print(f"server start at {Controller.config.server.url}")
 
             await server.serve()
@@ -66,15 +81,22 @@ class Server:
 
     @classmethod
     async def shutdown(cls):
-        await Controller.stop()
         if cls.server:
             cls.server.should_exit = True
 
     @classmethod
+    def dev_run(cls):
+        uvicorn.run(
+            "core.server.server:app", host="0.0.0.0", port=36799, log_level="info", access_log=True, reload=True
+        )
+
+    @classmethod
     def run(cls):
-        import asyncio
+        if "--dev" in sys.argv:
+            print("run server in dev mode")
+            cls.dev_run()
+        else:
+            import asyncio
 
-        from . import initialize, token
-
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(cls.serve())
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(cls.serve())
