@@ -128,8 +128,12 @@ async def get_current_user(data: Annotated[tuple[User, bool], Depends(parse_toke
     return data[0]
 
 
-async def get_system_acess(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
+async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
     return data[1]
+
+
+current_user_depends = Annotated[User, Depends(get_current_user)]
+system_access_depends = Annotated[bool, Depends(get_system_access)]
 
 
 @app.post("/api/login", tags=["token"])
