@@ -97,6 +97,7 @@ class User:
 
     async def stop(self, _: None = None):
         [i.un_register() for i in self.listeners]
+        self.listeners.clear()
 
         if isinstance(self.client, TiebaClient):
             await self.client.stop()
