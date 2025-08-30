@@ -21,6 +21,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=HTTP_ALLOW_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
 
 
 class BaseResponse[T](BaseModel):
@@ -47,13 +54,6 @@ class Server:
 
     @classmethod
     async def serve(cls):
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=HTTP_ALLOW_ORIGINS,
-            allow_methods=["*"],
-            allow_headers=["*"],
-            allow_credentials=True,
-        )
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
             server = uvicorn.Server(
