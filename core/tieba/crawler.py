@@ -175,12 +175,12 @@ class CrawlerManager:
         for user in UserManager.users.values():
             forum = user.config.forum
 
-            if user.config.enable and forum and user.config.rule_sets:
+            if user.config.enable and forum and user.config.rule_sets and forum.fname:
                 need = CrawlNeed(thread=forum.thread, post=forum.post, comment=forum.comment)
-                if forum.forum in new_needs:
-                    new_needs[forum.forum] += need
+                if forum.fname in new_needs:
+                    new_needs[forum.fname] += need
                 else:
-                    new_needs[forum.forum] = need
+                    new_needs[forum.fname] = need
 
         cls.needs = new_needs
         await cls.start_or_stop()

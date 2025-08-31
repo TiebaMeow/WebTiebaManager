@@ -22,7 +22,7 @@ class ForumConfig(BaseModel):
     block_reason: str = ""
     bduss: str = ""
     stoken: str = ""
-    forum: str = ""
+    fname: str = ""
     thread: bool = True
     post: bool = True
     comment: bool = True
