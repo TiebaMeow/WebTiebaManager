@@ -31,7 +31,7 @@ app.add_middleware(
 
 
 class BaseResponse[T](BaseModel):
-    code: int
+    code: int = 200
     data: T
 
 

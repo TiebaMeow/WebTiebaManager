@@ -79,6 +79,24 @@ class UserManager:
     def get_user(cls, username: str):
         return cls.users.get(username)
 
+    @classmethod
+    async def enable_user(cls, username: str):
+        user = cls.get_user(username)
+        if not user:
+            return False
+        user.config.enable = True
+        await user.update_config(user.config)
+        return True
+
+    @classmethod
+    async def disbale_user(cls, username: str):
+        user = cls.get_user(username)
+        if not user:
+            return False
+        user.config.enable = False
+        await user.update_config(user.config)
+        return True
+
 
 Controller.Start.on(UserManager.load_users)
 Controller.Stop.on(UserManager.clear_users)
