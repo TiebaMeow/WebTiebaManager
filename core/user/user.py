@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
+from core.config import write_config
 from core.constance import USER_DIR
 from core.control import Controller
 from core.process.process import Processer
@@ -19,6 +20,11 @@ if TYPE_CHECKING:
 
 
 class TiebaClientEmpty:
+    bduss = ""
+    stoken = ""
+    client = None  # type: ignore
+    info = None  # type: ignore
+
     def __init__(self) -> None:
         pass
 
@@ -89,6 +95,18 @@ class User:
 
         self.confirm = ConfirmCache(self.dir)
 
+    @property
+    def enable(self):
+        return self.config.enable
+
+    @property
+    def username(self):
+        return self.config.user.username
+
+    @property
+    def fname(self) -> str:
+        return self.config.forum.fname
+
     @classmethod
     async def create(cls, config: UserConfig):
         user = cls(config)
@@ -113,6 +131,11 @@ class User:
                 pass
         else:
             self.client = TiebaClientEmpty()
+
+        self.save_config()
+
+    def save_config(self):
+        write_config(self.config, self.dir / "config.toml")
 
     async def process(self, content: Content):
         obj = ProcessObject(content)

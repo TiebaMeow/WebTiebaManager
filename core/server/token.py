@@ -145,7 +145,7 @@ async def login_for_access_token(
     access_token_expires = timedelta(days=Controller.config.server.token_expire_days)
     access_token = create_access_token(
         data=TokenData(
-            username=user.config.user.username,
+            username=user.username,
             password_last_update=user.config.user.password_last_update,
             key_last_update=Controller.config.server.key_last_update if system_access else None,
         ).serialize(),

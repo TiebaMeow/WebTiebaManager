@@ -23,8 +23,8 @@ class GetHomeInfoData(BaseModel):
 async def get_home_info(user: current_user_depends) -> BaseResponse[GetHomeInfoData]:
     return BaseResponse(
         data=GetHomeInfoData(
-            enable=user.config.enable,
-            forum=user.config.forum.fname,
+            enable=user.enable,
+            forum=user.fname,
             account=GetHomeInfoAccount(
                 user_name=user.client.info.user_name,
                 nick_name=user.client.info.nick_name,
