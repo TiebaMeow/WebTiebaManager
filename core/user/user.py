@@ -79,6 +79,8 @@ class TiebaClient:
 
 
 class User:
+    CONFIG_FILE = "config.yaml"
+
     def __init__(self, config: UserConfig) -> None:
         """
         需调用update_config进行初始化
@@ -138,7 +140,7 @@ class User:
         self.save_config()
 
     def save_config(self):
-        write_config(self.config, self.dir / "config.toml")
+        write_config(self.config, self.dir / User.CONFIG_FILE)
 
     async def process(self, content: Content):
         obj = ProcessObject(content)

@@ -126,7 +126,7 @@ async def get_portrait(portrait: str):
 
 
 @app.get("/resources/image/{hash}", tags=["resources"])
-async def get_image(hash: str, size: Literal["s", "m", "l"] = "s"):
+async def get_image(hash: str, size: Literal["s", "m", "l"] = "s"):  # noqa: A002
     image = await (await AnonymousClient.get_client()).hash2image(hash, size=size)
     return StreamingResponse(
         content=ndarray2image(image.img),

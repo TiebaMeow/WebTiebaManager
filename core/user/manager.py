@@ -22,7 +22,7 @@ class UserManager:
             if not user_dir.is_dir():
                 continue
 
-            user_config_path = user_dir / "config.toml"
+            user_config_path = user_dir / User.CONFIG_FILE
             if not user_config_path.exists():
                 raise Exception(f"User config file not found for user {user_dir.stem}")
 
@@ -56,7 +56,7 @@ class UserManager:
         user = await User.create(config)
         cls.users[config.user.username] = user
 
-        write_config(config, user.dir / "config.toml")
+        write_config(config, user.dir / User.CONFIG_FILE)
 
     @classmethod
     async def delete_user(cls, username: str):
