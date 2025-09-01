@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from core.constance import CONTENT_VALID_EXPIRE
+from core.constance import BDUSS_MOSAIC, CONTENT_VALID_EXPIRE, STOKEN_MOSAIC
 from core.rule.rule_set import RuleSetConfig
 from core.util.tools import int_time
 
@@ -14,7 +14,7 @@ class UserInfo(BaseModel):
 
 class ProcessConfig(BaseModel):
     mandatory_confirm: bool = False
-    full_process: bool = False
+    fast_process: bool = False
 
 
 class ForumConfig(BaseModel):
@@ -31,6 +31,15 @@ class ForumConfig(BaseModel):
     @property
     def login_ready(self):
         return bool(self.bduss and self.stoken)
+
+    @property
+    def mosaic(self):
+        config = self.model_copy()
+        if len(config.bduss) > 10:
+            config.bduss = config.bduss[:6] + BDUSS_MOSAIC + config.bduss[-4:]
+        if len(config.stoken) > 10:
+            config.stoken = config.stoken[:6] + STOKEN_MOSAIC + config.stoken[-4:]
+        return config
 
 
 class UserConfig(BaseModel):

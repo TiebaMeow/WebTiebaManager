@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from core.config import CONFIG_PATH
 from core.control import Controller
+from core.tieba import crawler
 from core.user.manager import UserManager
 
 HTTP_ALLOW_ORIGINS = ["*"]
@@ -32,6 +33,7 @@ app.add_middleware(
 
 class BaseResponse[T](BaseModel):
     code: int = 200
+    message: str | None = None
     data: T
 
 

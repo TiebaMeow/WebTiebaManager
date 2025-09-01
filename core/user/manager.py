@@ -74,6 +74,7 @@ class UserManager:
             raise ValueError(f"User {config.user.username} does not exist")
 
         await cls.users[config.user.username].update_config(config)
+        await cls.UserConfigChange.broadcast(config)
 
     @classmethod
     def get_user(cls, username: str):

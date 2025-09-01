@@ -120,12 +120,15 @@ class User:
         if isinstance(self.client, TiebaClient):
             await self.client.stop()
 
-    async def update_config(self, config: UserConfig):
-        # TODO 判断输入的bduss, stoken是否有效（是否被马赛克）
-        self.config = config
-        self.processer = Processer(config)
-        if self.config.forum.login_ready:
-            self.client = await TiebaClient.create(self.config.forum.bduss, self.config.forum.stoken)
+    async def update_config(self, new_config: UserConfig):
+        old_config = self.config
+        self.config = new_config
+
+        self.processer = Processer(new_config)
+        if new_config.forum.login_ready and (
+            new_config.forum.bduss != old_config.forum.bduss or new_config.forum.stoken != old_config.forum.stoken
+        ):
+            self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken)
             if isinstance(self.client, TiebaClientEmpty):
                 # TODO 在这里添加登录失败提示
                 pass

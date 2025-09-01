@@ -25,7 +25,7 @@ class Processer:
         valid_rule_set = None
         for rule_set in self.rule_sets:
             if await rule_set.check(obj):
-                if not self.config.process.full_process:
+                if self.config.process.fast_process:
                     return rule_set
                 if valid_rule_set is None:
                     valid_rule_set = rule_set
