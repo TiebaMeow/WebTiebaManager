@@ -43,13 +43,13 @@ async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
     if not await Server.need_initialize():
         raise HTTPException(status_code=400, detail="系统已经初始化")
 
-    if Server.need_user():
+    if await Server.need_user():
         if not request.user:
             raise HTTPException(status_code=400, detail="请填写用户配置")
         user_config = UserConfig(user=UserInfo.model_validate(request.user.model_dump()))
         await UserManager.new_user(user_config, force=True)
 
-    if Server.need_system():
+    if await Server.need_system():
         if not request.system:
             raise HTTPException(status_code=400, detail="请填写系统配置")
 
