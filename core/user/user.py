@@ -69,7 +69,7 @@ class TiebaClient:
             await self.client.__aexit__()
 
     async def delete(self, content: Content):
-        if content.type == "Thread":
+        if content.type == "thread":
             return await self.client.del_thread(content.fname, tid=content.tid)
         else:
             return await self.client.del_post(content.fname, tid=content.tid, pid=content.pid)

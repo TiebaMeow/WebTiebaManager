@@ -44,7 +44,7 @@ class TextOptions(BaseModel):
 
 
 class TextRule(ContentRuleTemplate, RuleTemplate):
-    _series = "Text"
+    _series = "text"
     options: TextOptions
 
     async def _raw_check(self, value: str | None) -> bool:
@@ -81,7 +81,7 @@ class LimiterOptions(BaseModel):
 
 
 class LimiterRule(ContentRuleTemplate, RuleTemplate):
-    _series = "Limiter"
+    _series = "limiter"
     options: LimiterOptions
 
     async def _raw_check(self, value: float) -> bool:
@@ -117,7 +117,7 @@ class TimeOptions(BaseModel):
 
 
 class TimeRule(ContentRuleTemplate, RuleTemplate):
-    _series = "Time"
+    _series = "time"
     options: TimeOptions
 
     async def _raw_check(self, value: int | float | str) -> bool:
@@ -142,7 +142,7 @@ class CheckBoxOptions[T](BaseModel):
 
 
 class CheckBoxRule[T](ContentRuleTemplate, RuleTemplate):
-    _series = "CheckBox"
+    _series = "checkbox"
     options: CheckBoxOptions[T]
 
     async def _raw_check(self, value: T) -> bool:
@@ -158,7 +158,7 @@ class SelectOption[T](BaseModel):
 
 
 class SelectRule[T](ContentRuleTemplate, RuleTemplate):
-    _series = "Select"
+    _series = "select"
     options: SelectOption[T]
 
     async def _raw_check(self, value: T) -> bool:

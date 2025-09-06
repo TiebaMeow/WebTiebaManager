@@ -11,31 +11,31 @@ user_register = Rules.fix_category("用户")
 
 @user_register("用户名")
 class UserNameRule(TextRule):
-    type: Literal["UserName"] = "UserName"
+    type: Literal["user_name"] = "user_name"
     _target_attribute: str | list[str] = ["user", "user_name"]
 
 
 @user_register("昵称")
 class NickNameRule(TextRule):
-    type: Literal["NickName"] = "NickName"
+    type: Literal["nick_name"] = "nick_name"
     _target_attribute: str | list[str] = ["user", "nick_name"]
 
 
 @user_register("Portrait")
 class PortraitRule(TextRule):
-    type: Literal["Portrait"] = "Portrait"
+    type: Literal["portrait"] = "portrait"
     _target_attribute: str | list[str] = ["user", "portrait"]
 
 
 @user_register("等级")
 class LevelRule(LimiterRule):
-    type: Literal["Level"] = "Level"
+    type: Literal["level"] = "level"
     _target_attribute: str | list[str] = ["user", "level"]
 
 
 @user_register("IP")
 class IpRule(TextRule):
-    type: Literal["Ip"] = "Ip"
+    type: Literal["ip"] = "ip"
     priority: int = 45
 
     async def check(self, obj: ProcessObject) -> bool:
@@ -46,7 +46,7 @@ class IpRule(TextRule):
 
 @user_register("贴吧号")
 class TiebaUidRUle(TextRule):
-    type: Literal["TiebaUid"] = "TiebaUid"
+    type: Literal["tieba_uid"] = "tieba_uid"
     priority: int = 45
 
     async def check(self, obj: ProcessObject) -> bool:

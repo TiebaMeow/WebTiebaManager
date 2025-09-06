@@ -93,11 +93,11 @@ class BaseContent(BaseModel):
 
     @property
     def mark(self):
-        _type: Literal["Thread", "Post", "Comment"] = self.type  # type: ignore
+        _type: Literal["thread", "post", "comment"] = self.type  # type: ignore
 
-        if _type == "Thread":
+        if _type == "thread":
             return self.title
-        elif _type == "Post":
+        elif _type == "post":
             return f"{self.title} {self.floor}楼"
         else:
             return f"{self.title} {self.floor}楼 楼中楼"
@@ -105,13 +105,13 @@ class BaseContent(BaseModel):
     @property
     def link(self):
         return f"https://tieba.baidu.com/p/{self.tid}" + (
-            "" if self.type == "Thread" else f"?pid={self.pid}#{self.pid}"  # type: ignore
+            "" if self.type == "thread" else f"?pid={self.pid}#{self.pid}"  # type: ignore
         )
 
 
 class Thread(BaseContent, ContentInterface):
     floor: int = 1
-    type: Literal["Thread"] = "Thread"
+    type: Literal["thread"] = "thread"
 
     @classmethod
     def from_aiotieba_data(cls, data: aiotieba.typing.Thread):
@@ -141,7 +141,7 @@ class Thread(BaseContent, ContentInterface):
 
 
 class Post(BaseContent, ContentInterface):
-    type: Literal["Post"] = "Post"
+    type: Literal["post"] = "post"
 
     @classmethod
     def from_aiotieba_data(cls, data: aiotieba.typing.Post, title: str | None = None):
@@ -175,7 +175,7 @@ class Post(BaseContent, ContentInterface):
 
 
 class Comment(BaseContent, ContentInterface):
-    type: Literal["Comment"] = "Comment"
+    type: Literal["comment"] = "comment"
 
     @classmethod
     def from_aiotieba_data(cls, data: aiotieba.typing.Comment, title: str | None = None):

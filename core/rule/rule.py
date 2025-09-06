@@ -83,7 +83,7 @@ class Rules:
                 name=name,
                 category=category,
                 description=description,
-                series=getattr(default_rule, "_series", "Custom"),
+                series=getattr(default_rule, "_series", "custom"),
                 values=values,
             )
 
