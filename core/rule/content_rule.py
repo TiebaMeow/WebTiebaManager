@@ -1,9 +1,7 @@
 from typing import Literal
 
-from core.process.typedef import ProcessObject
-
-from .rule import Rules, RuleTemplate
-from .template import CheckBoxRule, LimiterRule, TextRule
+from .rule import Rules
+from .template import CheckBoxRule, LimiterRule, TextRule, TimeRule
 
 content_register = Rules.fix_category("帖子")
 
@@ -15,7 +13,7 @@ class ContentTextRule(TextRule):
 
 
 @content_register("创建时间")
-class CreateTimeRule(LimiterRule):
+class CreateTimeRule(TimeRule):
     type: Literal["CreateTime"] = "CreateTime"
     _target_attribute: str | list[str] = "create_time"
 
@@ -26,7 +24,8 @@ class FloorRule(LimiterRule):
     _target_attribute: str | list[str] = "floor"
 
 
-@content_register("类型", default_options={"value": []})
+# 需要更新支持
+@content_register("类型", values={"Thread": "主题帖", "Post": "回帖", "Comment": "楼中楼"})
 class ContentTypeRule(CheckBoxRule[Literal["Thread", "Post", "Comment"]]):
     type: Literal["ContentType"] = "ContentType"
     _target_attribute: str | list[str] = "type"

@@ -81,22 +81,22 @@ class Operations:
             return OperationGroup([adapter.validate_python(i) for i in operations])  # type: ignore
 
 
+class DeleteOptions(BaseModel):
+    delete_thread_if_author: bool = False
+
+
 @Operations.register
 class Delete(OperationTemplate):
-    type: Literal["Delete"] = "Delete"
+    type: Literal["delete"] = "delete"
+    options: DeleteOptions = DeleteOptions()
 
 
 class BlockOptions(BaseModel):
-    day: int = 0
+    day: int | None = 1
     reason: str = ""
 
 
 @Operations.register
 class Block(OperationTemplate):
-    type: Literal["Block"] = "Block"
+    type: Literal["block"] = "block"
     options: BlockOptions = BlockOptions()
-
-
-@Operations.register
-class AuthorDelete(OperationTemplate):
-    type: Literal["AuthorDelete"] = "AuthorDelete"

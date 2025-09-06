@@ -173,16 +173,19 @@ class User:
                 raise ValueError(f"Unknown operation: {operations}")
         else:
             for operation in operations:
-                if operation.type == "Delete":
+                if operation.type == "delete":
+                    if operation.options.delete_thread_if_author:
+                        # TODO db查询，完成功能适配
+                        pass
                     await self.client.delete(obj.content)
-                elif operation.type == "Block":
+                elif operation.type == "block":
                     await self.client.block(
                         obj.content,
                         operation.options.day or self.config.forum.block_day,
                         operation.options.reason or self.config.forum.block_reason,
                     )
-                elif operation.type == "AuthorDelete":
-                    # TODO db查询，完成功能适配
+                else:
+                    # log不支持的处理
                     pass
 
     async def operate_rule_set(self, obj: ProcessObject, rule_set: RuleSet):

@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 from core.constance import BDUSS_MOSAIC
 from core.control import Controller
+from core.rule.rule import RuleInfo, Rules
+from core.rule.rule_set import RuleSetConfig
 from core.user.config import ForumConfig, ProcessConfig
 from core.user.manager import UserManager
 
@@ -106,6 +108,24 @@ async def set_user_config(user: current_user_depends, req: UserConfigData) -> Ba
     return BaseResponse(data=True)
 
 
+@app.get("/api/rule/info", tags=["rule"])
+async def get_rule_info(user: current_user_depends) -> BaseResponse[list[RuleInfo]]:
+    return BaseResponse(data=list(Rules.rule_info.values()))
+
+
+@app.get("/api/rule/get", tags=["rule"])
+async def get_rule_sets(user: current_user_depends) -> BaseResponse[list[RuleSetConfig]]:
+    return BaseResponse(data=user.config.rule_sets)
+
+
+@app.post("/api/rule/set", tags=["rule"])
+async def set_rule_sets(user: current_user_depends, rule_sets: list[RuleSetConfig]) -> BaseResponse[bool]:
+    config = user.config.model_copy(deep=True)
+    config.rule_sets = rule_sets
+    await UserManager.update_config(config)
+    return BaseResponse(data=True)
+
+
 def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
     if image is None or not image.any():
         image_bytes = b""
@@ -116,7 +136,7 @@ def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
 
 
 @app.get("/resources/portrait/{portrait}", tags=["resources"])
-async def get_portrait(portrait: str):
+async def get_portrait(portrait: str) -> StreamingResponse:
     image = await (await AnonymousClient.get_client()).get_portrait(portrait, size="s")
     return StreamingResponse(
         content=ndarray2image(image.img),
@@ -126,7 +146,7 @@ async def get_portrait(portrait: str):
 
 
 @app.get("/resources/image/{hash}", tags=["resources"])
-async def get_image(hash: str, size: Literal["s", "m", "l"] = "s"):  # noqa: A002
+async def get_image(hash: str, size: Literal["s", "m", "l"] = "s") -> StreamingResponse:  # noqa: A002
     image = await (await AnonymousClient.get_client()).hash2image(hash, size=size)
     return StreamingResponse(
         content=ndarray2image(image.img),

@@ -14,7 +14,7 @@ class UserInfo(BaseModel):
 
 class ProcessConfig(BaseModel):
     mandatory_confirm: bool = False
-    fast_process: bool = False
+    fast_process: bool = True
 
 
 class ForumConfig(BaseModel):
