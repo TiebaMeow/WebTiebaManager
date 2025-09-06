@@ -144,7 +144,7 @@ class Crawler:
                 target_pn = reply_num // 30 + 1 if reply_num % 30 != 0 else reply_num // 30
                 async with self.eta:
                     raw_comments.extend(
-                        Comment.from_aiotieba_data(i)
+                        Comment.from_aiotieba_data(i, title=thread.title)
                         for i in await self.client.get_comments(post.tid, post.pid, pn=target_pn)
                     )
 
@@ -154,6 +154,8 @@ class Crawler:
                     if self.cache.get(comment.pid) is None:
                         self.cache.set(comment.pid, 1)
                         yield comment
+
+        self.cache.save_data()
 
     def save_cache(self):
         self.cache.save_data()
