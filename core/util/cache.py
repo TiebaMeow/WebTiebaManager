@@ -27,9 +27,10 @@ class ExpireCache[T]:
         self.path = path
 
         if clear_after_set:
+            raw_set = self.set
 
             def set_(key: ExpireCache.POSSIBLE_KEY, data: T):
-                ExpireCache.set(self, key, data)
+                raw_set(key, data)
                 self.clean()
 
             self.set = set_
@@ -108,7 +109,7 @@ class ExpireCache[T]:
         return data
 
     @staticmethod
-    def unserialize_data(data: T):
+    def unserialize_data(data):
         return data
 
     def save_data(self) -> None:
