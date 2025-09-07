@@ -8,7 +8,7 @@ import numpy as np
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from core.constance import BDUSS_MOSAIC
+from core.constance import BDUSS_MOSAIC, STOKEN_MOSAIC
 from core.control import Controller
 from core.rule.rule import RuleInfo, Rules
 from core.rule.rule_set import RuleSetConfig
@@ -101,7 +101,7 @@ async def set_user_config(user: current_user_depends, req: UserConfigData) -> Ba
     config = user.config.model_copy(deep=True)
     if BDUSS_MOSAIC in req.forum.bduss:
         req.forum.bduss = user.config.forum.bduss
-    if BDUSS_MOSAIC in req.forum.stoken:
+    if STOKEN_MOSAIC in req.forum.stoken:
         req.forum.stoken = user.config.forum.stoken
     config.forum = req.forum
     config.process = req.process
