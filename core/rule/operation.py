@@ -54,13 +54,11 @@ class OperationGroup:
             return OperationGroup(operations=operations)
 
     @property
-    def no_direct_operations(self) -> OperationGroup | None:
+    def no_direct_operations(self) -> OperationGroup:
         if isinstance(self.operations, str):
             return OperationGroup(self.operations)  # type: ignore
         else:
             operations = [i for i in self.operations if not i.direct]
-            if not operations:
-                return None
             return OperationGroup(operations=operations)
 
     @staticmethod
