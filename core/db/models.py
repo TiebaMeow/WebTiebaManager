@@ -7,8 +7,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import BIGINT, JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, foreign, mapped_column, relationship
 
+from ..typedef import Image  # noqa: TC001
+
 if TYPE_CHECKING:
-    from ..typedef import Content, Image, User
+    from ..typedef import Content, User
 
 
 class Base(DeclarativeBase):
@@ -102,7 +104,7 @@ class ContentModel(Base):
             text=content.text,
             create_time=datetime.fromtimestamp(content.create_time, tz=SHANGHAI_TZ),
             floor=content.floor,
-            images=content.images,
+            images=[i.model_dump() for i in content.images],
             type=content.type,
             author_id=content.user.user_id,
         )

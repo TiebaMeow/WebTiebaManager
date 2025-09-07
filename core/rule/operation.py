@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, TypeAdapter
+
+if TYPE_CHECKING:
+    from core.process.typedef import ProcessObject
+
+from core.tieba.info import TiebaInfo
 
 
 class OperationTemplate(BaseModel):
@@ -19,6 +24,9 @@ class OperationTemplate(BaseModel):
             data["direct"] = self.direct
 
         return data
+
+    async def store_data(self, obj: ProcessObject, data: dict[str, Any]) -> None:
+        pass
 
 
 STR_OPERATION = Literal["ignore", "delete", "block", "delete_and_block"]
@@ -89,6 +97,10 @@ class DeleteOptions(BaseModel):
 class Delete(OperationTemplate):
     type: Literal["delete"] = "delete"
     options: DeleteOptions = DeleteOptions()
+
+    async def store_data(self, obj: ProcessObject, data: dict[str, Any]) -> None:
+        if data.get("is_thread_author") is None:
+            data["is_thread_author"] = await TiebaInfo.get_if_thread_author(obj)
 
 
 class BlockOptions(BaseModel):

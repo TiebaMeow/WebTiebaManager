@@ -9,6 +9,7 @@ from core.process.process import Processer
 from core.process.typedef import ProcessObject
 from core.rule.operation import OperationGroup
 from core.rule.rule_set import RuleSet
+from core.tieba.info import TiebaInfo
 from core.typedef import Content
 from core.util.tools import int_time
 
@@ -20,6 +21,9 @@ if TYPE_CHECKING:
 
 
 class TiebaClientEmpty:
+    class InvalidClientError(Exception):
+        pass
+
     bduss = ""
     stoken = ""
     client = None  # type: ignore
@@ -29,10 +33,16 @@ class TiebaClientEmpty:
         pass
 
     async def delete(self, content: Content):
-        raise Exception("invalid client")
+        raise self.InvalidClientError("invalid client")
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        raise Exception("invalid client")
+        raise self.InvalidClientError("invalid client")
+
+    async def delete_thread(self, fname: str, tid: int):
+        raise self.InvalidClientError("invalid client")
+
+    async def delete_post(self, fname: str, tid: int, pid: int):
+        raise self.InvalidClientError("invalid client")
 
 
 class TiebaClient:
@@ -68,11 +78,17 @@ class TiebaClient:
         if self.client:
             await self.client.__aexit__()
 
+    async def delete_thread(self, fname: str, tid: int):
+        return await self.client.del_thread(fname, tid=tid)
+
+    async def delete_post(self, fname: str, tid: int, pid: int):
+        return await self.client.del_post(fname, tid=tid, pid=pid)
+
     async def delete(self, content: Content):
         if content.type == "thread":
-            return await self.client.del_thread(content.fname, tid=content.tid)
+            return await self.delete_thread(content.fname, tid=content.tid)
         else:
-            return await self.client.del_post(content.fname, tid=content.tid, pid=content.pid)
+            return await self.delete_post(content.fname, tid=content.tid, pid=content.pid)
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
         return await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
@@ -179,8 +195,10 @@ class User:
             for operation in operations:
                 if operation.type == "delete":
                     if operation.options.delete_thread_if_author:
-                        # TODO db查询，完成功能适配
-                        pass
+                        if await TiebaInfo.get_if_thread_author(obj):
+                            await self.client.delete_thread(obj.content.fname, obj.content.tid)
+                            continue
+
                     await self.client.delete(obj.content)
                 elif operation.type == "block":
                     await self.client.block(
@@ -201,13 +219,20 @@ class User:
                 await self.operate(obj, og)
 
             og = rule_set.operations.no_direct_operations
-            # TODO 在这里储存所需的数据
+
             if og:
+                data = {}
+
+                if not isinstance(og.operations, str):
+                    for operation in og.operations:
+                        # 储存operation需要的数据
+                        await operation.store_data(obj, data)
+
                 self.confirm.set(
                     obj.content.pid,
                     ConfirmData(
                         content=obj.content,
-                        data={},
+                        data=data,
                         operations=og.serialize(),
                         process_time=int_time(),
                         rule_set_name=rule_set.name,
@@ -215,7 +240,11 @@ class User:
                 )
 
         else:
-            await self.operate(obj, rule_set.operations)
+            try:
+                await self.operate(obj, rule_set.operations)
+            except TiebaClientEmpty.InvalidClientError:
+                # TODO 登录失效提示
+                pass
 
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         # TODO confirm日志显示

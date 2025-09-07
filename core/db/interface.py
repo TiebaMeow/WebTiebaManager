@@ -14,52 +14,14 @@ result = await Database.get_contents_by_pids(pids)
 
 from collections.abc import AsyncGenerator, Iterable
 from contextlib import asynccontextmanager
-from pathlib import Path
-from typing import Literal
-from urllib.parse import quote_plus
 
-from pydantic import BaseModel, computed_field
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from core.control import Controller
 
+from .config import DatabaseConfig
 from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
-
-
-class DatabaseConfig(BaseModel, extra="ignore"):
-    type: Literal["sqlite", "postgresql", "mysql"]
-    path: str | None = None
-    username: str | None = None
-    password: str | None = None
-    host: str | None = None
-    port: int | None = None
-    db: str | None = None
-
-    @computed_field
-    @property
-    def database_url(self) -> str:
-        if self.type == "sqlite":
-            if not self.path:
-                raise ValueError("SQLite database path is required")
-            url_path = Path(self.path).resolve().as_posix()
-            return f"sqlite+aiosqlite:///{url_path}"
-        if not all([self.username, self.password, self.host, self.port, self.db]):
-            raise ValueError("Database configuration is incomplete")
-        if self.type == "postgresql":
-            return (
-                f"postgresql+asyncpg://"
-                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
-                f"@{self.host}:{self.port}/{self.db}"
-            )
-        elif self.type == "mysql":
-            return (
-                f"mysql+asyncmy://"
-                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
-                f"@{self.host}:{self.port}/{self.db}"
-            )
-        else:
-            raise ValueError("Unsupported database type")
 
 
 class Database:
@@ -69,7 +31,7 @@ class Database:
     @classmethod
     async def startup(cls, _: None = None) -> None:
         config = Controller.config
-        database_config = DatabaseConfig.model_validate(config)
+        database_config = DatabaseConfig.model_validate(config.database)
         cls.engine = create_async_engine(
             database_config.database_url,
             pool_pre_ping=(database_config.type != "sqlite"),
@@ -111,6 +73,14 @@ class Database:
         async with cls.get_session() as session:
             result = await session.execute(select(ContentModel).where(ContentModel.pid.in_(pid_list)))
             return list(result.scalars().all())
+
+    @classmethod
+    async def get_thread_by_tid(cls, tid: int) -> ContentModel | None:
+        async with cls.get_session() as session:
+            result = await session.execute(
+                select(ContentModel).where(ContentModel.tid == tid, ContentModel.type == "thread")
+            )
+            return result.scalars().first()
 
 
 Controller.Start.on(Database.startup)
