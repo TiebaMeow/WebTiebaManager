@@ -151,9 +151,10 @@ class Crawler:
                 self.cache.set(post.pid, reply_num)
 
                 for comment in raw_comments:
-                    self.cache.set(comment.pid, 1)
                     if self.cache.get(comment.pid) is None:
                         yield comment
+
+                    self.cache.set(comment.pid, 1)
 
         self.cache.save_data()
 
