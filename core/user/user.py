@@ -95,7 +95,7 @@ class User:
         if not self.dir.exists():
             self.dir.mkdir(parents=True)
 
-        self.confirm = ConfirmCache(self.dir)
+        self.confirm = ConfirmCache(self.dir, expire=self.config.process.confirm_expire)
 
     @property
     def enable(self):
@@ -136,6 +136,10 @@ class User:
                 pass
         else:
             self.client = TiebaClientEmpty()
+
+        if old_config.process.confirm_expire != new_config.process.confirm_expire:
+            self.confirm.save_data()
+            self.confirm = ConfirmCache(self.dir, expire=new_config.process.confirm_expire)
 
         self.save_config()
 
@@ -197,6 +201,7 @@ class User:
                 await self.operate(obj, og)
 
             og = rule_set.operations.no_direct_operations
+            # TODO 在这里储存所需的数据
             if og:
                 self.confirm.set(
                     obj.content.pid,

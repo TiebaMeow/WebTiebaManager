@@ -1,3 +1,4 @@
+import asyncio
 import io
 from typing import Literal
 
@@ -12,7 +13,8 @@ from core.control import Controller
 from core.rule.rule import RuleInfo, Rules
 from core.rule.rule_set import RuleSetConfig
 from core.user.config import ForumConfig, ProcessConfig
-from core.user.manager import UserManager
+from core.user.confirm import ConfirmSimpleData
+from core.user.manager import User, UserManager
 
 from .server import BaseResponse, app
 from .token import current_user_depends
@@ -126,6 +128,13 @@ async def set_rule_sets(user: current_user_depends, rule_sets: list[RuleSetConfi
     return BaseResponse(data=True)
 
 
+@app.get("/api/confirm/get_list", tags=["confirm"])
+async def get_confirm_list(user: current_user_depends) -> BaseResponse[list[ConfirmSimpleData]]:
+    return BaseResponse(
+        data=[i.simple for i in sorted(user.confirm.data.values(), key=lambda x: x.process_time, reverse=True)]
+    )
+
+
 def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
     if image is None or not image.any():
         image_bytes = b""
@@ -133,6 +142,33 @@ def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
         image_bytes = cv2.imencode(".webp", image)[1].tobytes()
 
     return io.BytesIO(image_bytes)
+
+
+class ConfirmRequest(BaseModel):
+    pid: int | list[int]
+    action: Literal["ignore", "execute"]
+
+
+async def confirm_many(user: User, pids: list[int], action: Literal["ignore", "execute"]):
+    confirms = [confirm for pid in pids if (confirm := user.confirm.get(pid))]
+    for confirm in confirms:
+        await user.operate_confirm(confirm, action)
+
+
+@app.post("/api/confirm/confirm", tags=["confirm"])
+async def confirm_operation(user: current_user_depends, request: ConfirmRequest) -> BaseResponse[bool]:
+    if request.action == "execute" and not user.client.info:
+        return BaseResponse(data=False, message="账号未登录，不能执行确认操作", code=400)
+
+    if isinstance(request.pid, int):
+        if not (confirm := user.confirm.get(request.pid)):
+            return BaseResponse(data=False, message="内容不存在", code=400)
+
+        await user.operate_confirm(confirm, request.action)
+        return BaseResponse(data=True, message="操作成功")
+    else:
+        asyncio.create_task(confirm_many(user, request.pid, request.action))
+        return BaseResponse(data=True, message="正在批量执行操作，请稍后查看结果")
 
 
 @app.get("/resources/portrait/{portrait}", tags=["resources"])

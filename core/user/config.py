@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from core.constance import BDUSS_MOSAIC, CONTENT_VALID_EXPIRE, STOKEN_MOSAIC
+from core.constance import BDUSS_MOSAIC, CONFIRM_EXPIRE, CONTENT_VALID_EXPIRE, STOKEN_MOSAIC
 from core.rule.rule_set import RuleSetConfig
 from core.util.tools import int_time
 
@@ -15,6 +15,8 @@ class UserInfo(BaseModel):
 class ProcessConfig(BaseModel):
     mandatory_confirm: bool = False
     fast_process: bool = True
+    confirm_expire: int = CONFIRM_EXPIRE
+    content_validate_expire: int = CONTENT_VALID_EXPIRE
 
 
 class ForumConfig(BaseModel):
@@ -26,7 +28,6 @@ class ForumConfig(BaseModel):
     thread: bool = True
     post: bool = True
     comment: bool = True
-    content_validate_expire: int = CONTENT_VALID_EXPIRE
 
     @property
     def login_ready(self):

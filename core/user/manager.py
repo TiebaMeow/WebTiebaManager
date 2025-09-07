@@ -81,22 +81,25 @@ class UserManager:
         return cls.users.get(username)
 
     @classmethod
-    async def enable_user(cls, username: str):
+    async def change_user_status(cls, username: str, status: bool):
         user = cls.get_user(username)
         if not user:
             return False
-        user.config.enable = True
-        await user.update_config(user.config)
+        if user.config.enable == status:
+            return True
+
+        new_config = user.config.model_copy(deep=True)
+        new_config.enable = status
+        await cls.update_config(new_config)
         return True
 
     @classmethod
+    async def enable_user(cls, username: str):
+        return await cls.change_user_status(username, True)
+
+    @classmethod
     async def disbale_user(cls, username: str):
-        user = cls.get_user(username)
-        if not user:
-            return False
-        user.config.enable = False
-        await user.update_config(user.config)
-        return True
+        return await cls.change_user_status(username, False)
 
 
 Controller.Start.on(UserManager.load_users)
