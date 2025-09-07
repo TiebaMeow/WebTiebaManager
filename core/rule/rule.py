@@ -7,10 +7,12 @@ from ..process.typedef import ProcessObject
 
 
 class RuleInfo(BaseModel):
-    type: str
-    name: str
-    category: str
-    description: str
+    type: str  # 类型，如UserNameRule、IpRule等
+    name: str  # 用户友善的名称
+    category: str  # 分类，如用户、帖子等
+    description: str  # 描述
+    series: str  # 基本类型，如Text, Limiter
+    values: dict[str, str] | None  # 用于CheckBox/Select，提供给网页端信息 {原键: 用户友好名称}
 
 
 class RuleTemplate(BaseModel, ABC):
@@ -53,6 +55,7 @@ class Rules:
         category: str,
         description: str = "无描述",
         default_options: Any = None,
+        values: dict[str, str] | None = None,  # 用于CheckBox/Select，提供给网页端信息
     ):
         def wrapper(rule: type["RuleTemplate"]):
             nonlocal default_options
@@ -65,14 +68,24 @@ class Rules:
             if default_options is None:
                 default_options = {}
 
-            default_rule = rule(options=default_options)
+            if values:
+                default_rule = rule(options={"values": list(values.keys()), "value": list(values.keys())[0]})
+            else:
+                default_rule = rule(options=default_options)
             try:
                 rule_type = default_rule.type  # type: ignore
             except AttributeError as e:
                 raise Exception("规则类型未定义") from e
 
             cls.rule_dict[rule_type] = rule  # type: ignore
-            cls.rule_info[rule_type] = RuleInfo(type=rule_type, name=name, category=category, description=description)
+            cls.rule_info[rule_type] = RuleInfo(
+                type=rule_type,
+                name=name,
+                category=category,
+                description=description,
+                series=getattr(default_rule, "_series", "custom"),
+                values=values,
+            )
 
             return rule
 
@@ -81,11 +94,9 @@ class Rules:
     @classmethod
     def fix_category(cls, category: str):
         def _(
-            name: str,
-            description: str = "无描述",
-            default_options: Any = None,
+            name: str, description: str = "无描述", default_options: Any = None, values: dict[str, str] | None = None
         ):
-            return cls.register(name, category, description=description, default_options=default_options)
+            return cls.register(name, category, description=description, default_options=default_options, values=values)
 
         return _
 

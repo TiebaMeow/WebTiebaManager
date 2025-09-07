@@ -29,7 +29,8 @@ class ExpireCache[T]:
         if clear_after_set:
 
             def set_(key: ExpireCache.POSSIBLE_KEY, data: T):
-                ExpireCache.set(self, key, data)
+                # 自动调用当前实例的 set 方法（支持子类重写）
+                type(self).set(self, key, data)
                 self.clean()
 
             self.set = set_
@@ -108,7 +109,7 @@ class ExpireCache[T]:
         return data
 
     @staticmethod
-    def unserialize_data(data: T):
+    def unserialize_data(data):
         return data
 
     def save_data(self) -> None:

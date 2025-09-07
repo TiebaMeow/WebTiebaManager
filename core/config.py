@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import tomlkit
+import yaml
 from pydantic import BaseModel
 
 from .constance import BASE_DIR
@@ -17,7 +18,7 @@ class SystemConfig(BaseModel, extra="ignore"):
 def read_config[T](path: Path, obj: type[T]) -> T:
     if path.exists():
         with path.open(encoding="utf8") as f:
-            return obj.model_validate(tomlkit.load(f) or {})  # type: ignore
+            return obj.model_validate((tomlkit.load(f) if path.suffix == ".toml" else yaml.safe_load(f)) or {})  # type: ignore
     else:
         return obj.model_validate({})  # type: ignore
 
@@ -27,6 +28,9 @@ CONFIG_PATH = BASE_DIR / "config.toml"
 system_config = read_config(CONFIG_PATH, SystemConfig)
 
 
-def write_config(config, path: os.PathLike = CONFIG_PATH):
+def write_config(config, path: Path = CONFIG_PATH):
     with Path(path).open(mode="w", encoding="utf8") as f:
-        tomlkit.dump(config.model_dump(), f)
+        if path.suffix == ".toml":
+            tomlkit.dump(config.model_dump(), f)
+        else:
+            yaml.dump(config.model_dump(), f, allow_unicode=True, indent=2)

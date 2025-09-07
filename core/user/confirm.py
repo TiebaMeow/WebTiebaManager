@@ -8,12 +8,19 @@ from core.typedef import Content
 from core.util.cache import ExpireCache
 
 
-class ConfirmData(BaseModel):
+class ConfirmSimpleData(BaseModel):
     content: Content
-    data: dict
-    operations: str | list[dict[str, Any]]
     process_time: int
     rule_set_name: str
+
+
+class ConfirmData(ConfirmSimpleData):
+    data: dict
+    operations: str | list[dict[str, Any]]
+
+    @property
+    def simple(self):
+        return ConfirmSimpleData(content=self.content, process_time=self.process_time, rule_set_name=self.rule_set_name)
 
 
 class ConfirmCache(ExpireCache[ConfirmData]):
@@ -31,3 +38,11 @@ class ConfirmCache(ExpireCache[ConfirmData]):
         result = super().delete(key)
         self.save_data()
         return result
+
+    @staticmethod
+    def serialize_data(data):
+        return data.model_dump()
+
+    @staticmethod
+    def unserialize_data(data: dict):
+        return ConfirmData.model_validate(data)

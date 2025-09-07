@@ -144,7 +144,7 @@ class Crawler:
                 target_pn = reply_num // 30 + 1 if reply_num % 30 != 0 else reply_num // 30
                 async with self.eta:
                     raw_comments.extend(
-                        Comment.from_aiotieba_data(i)
+                        Comment.from_aiotieba_data(i, title=thread.title)
                         for i in await self.client.get_comments(post.tid, post.pid, pn=target_pn)
                     )
 
@@ -152,8 +152,11 @@ class Crawler:
 
                 for comment in raw_comments:
                     if self.cache.get(comment.pid) is None:
-                        self.cache.set(comment.pid, 1)
                         yield comment
+
+                    self.cache.set(comment.pid, 1)
+
+        self.cache.save_data()
 
     def save_cache(self):
         self.cache.save_data()
@@ -175,18 +178,18 @@ class CrawlerManager:
         for user in UserManager.users.values():
             forum = user.config.forum
 
-            if user.config.enable and forum and user.config.rule_sets:
+            if user.enable and forum and user.config.rule_sets and forum.fname:
                 need = CrawlNeed(thread=forum.thread, post=forum.post, comment=forum.comment)
-                if forum.forum in new_needs:
-                    new_needs[forum.forum] += need
+                if forum.fname in new_needs:
+                    new_needs[forum.fname] += need
                 else:
-                    new_needs[forum.forum] = need
+                    new_needs[forum.fname] = need
 
         cls.needs = new_needs
         await cls.start_or_stop()
 
     @classmethod
-    async def start_or_stop(cls):
+    async def start_or_stop(cls, _: None = None):
         if cls.needs and not cls.task and Controller.running:
             cls.task = asyncio.create_task(cls.crawl())
         if (not cls.needs or not Controller.running) and cls.task:
@@ -220,3 +223,4 @@ class CrawlerManager:
 UserManager.UserChange.on(CrawlerManager.update_needs)
 UserManager.UserConfigChange.on(CrawlerManager.update_needs)
 Controller.SystemConfigChange.on(CrawlerManager.restart)
+Controller.Stop.on(CrawlerManager.start_or_stop)

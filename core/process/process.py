@@ -13,8 +13,10 @@ class Processer:
         self.config = config
 
     async def process(self, obj: ProcessObject) -> RuleSet | None:
-        if obj.content.fname != self.config.forum.forum or not getattr(
-            self.config.forum, obj.content.type.lower(), False
+        if (
+            obj.content.fname != self.config.forum.fname
+            or not getattr(self.config.forum, obj.content.type.lower(), False)
+            or not self.config.enable
         ):
             return None
 
@@ -25,7 +27,7 @@ class Processer:
         valid_rule_set = None
         for rule_set in self.rule_sets:
             if await rule_set.check(obj):
-                if not self.config.process.full_process:
+                if self.config.process.fast_process:
                     return rule_set
                 if valid_rule_set is None:
                     valid_rule_set = rule_set

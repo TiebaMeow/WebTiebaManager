@@ -16,15 +16,13 @@ class UserManager:
 
     @classmethod
     async def silent_load_users(cls):
-        for user in cls.users.values():
-            await user.stop()
+        await cls.clear_users()
 
-        cls.users.clear()
         for user_dir in USER_DIR.iterdir():
             if not user_dir.is_dir():
                 continue
 
-            user_config_path = user_dir / "config.toml"
+            user_config_path = user_dir / User.CONFIG_FILE
             if not user_config_path.exists():
                 raise Exception(f"User config file not found for user {user_dir.stem}")
 
@@ -40,6 +38,13 @@ class UserManager:
         await cls.UserChange.broadcast(None)
 
     @classmethod
+    async def clear_users(cls, _: None = None):
+        for user in cls.users.values():
+            await user.stop()
+
+        cls.users.clear()
+
+    @classmethod
     async def new_user(cls, config: UserConfig, force: bool = False):
         if config.user.username in cls.users:
             if force:
@@ -51,7 +56,7 @@ class UserManager:
         user = await User.create(config)
         cls.users[config.user.username] = user
 
-        write_config(config, user.dir / "config.toml")
+        write_config(config, user.dir / User.CONFIG_FILE)
 
     @classmethod
     async def delete_user(cls, username: str):
@@ -69,10 +74,33 @@ class UserManager:
             raise ValueError(f"User {config.user.username} does not exist")
 
         await cls.users[config.user.username].update_config(config)
+        await cls.UserConfigChange.broadcast(config)
 
     @classmethod
     def get_user(cls, username: str):
         return cls.users.get(username)
 
+    @classmethod
+    async def change_user_status(cls, username: str, status: bool):
+        user = cls.get_user(username)
+        if not user:
+            return False
+        if user.config.enable == status:
+            return True
+
+        new_config = user.config.model_copy(deep=True)
+        new_config.enable = status
+        await cls.update_config(new_config)
+        return True
+
+    @classmethod
+    async def enable_user(cls, username: str):
+        return await cls.change_user_status(username, True)
+
+    @classmethod
+    async def disable_user(cls, username: str):
+        return await cls.change_user_status(username, False)
+
 
 Controller.Start.on(UserManager.load_users)
+Controller.Stop.on(UserManager.clear_users)

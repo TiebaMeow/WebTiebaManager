@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
+from core.config import write_config
 from core.constance import USER_DIR
 from core.control import Controller
 from core.process.process import Processer
@@ -19,6 +20,11 @@ if TYPE_CHECKING:
 
 
 class TiebaClientEmpty:
+    bduss = ""
+    stoken = ""
+    client = None  # type: ignore
+    info = None  # type: ignore
+
     def __init__(self) -> None:
         pass
 
@@ -63,7 +69,7 @@ class TiebaClient:
             await self.client.__aexit__()
 
     async def delete(self, content: Content):
-        if content.type == "Thread":
+        if content.type == "thread":
             return await self.client.del_thread(content.fname, tid=content.tid)
         else:
             return await self.client.del_post(content.fname, tid=content.tid, pid=content.pid)
@@ -73,6 +79,8 @@ class TiebaClient:
 
 
 class User:
+    CONFIG_FILE = "config.yaml"
+
     def __init__(self, config: UserConfig) -> None:
         """
         需调用update_config进行初始化
@@ -87,7 +95,19 @@ class User:
         if not self.dir.exists():
             self.dir.mkdir(parents=True)
 
-        self.confirm = ConfirmCache(self.dir)
+        self.confirm = ConfirmCache(self.dir, expire=self.config.process.confirm_expire)
+
+    @property
+    def enable(self):
+        return self.config.enable
+
+    @property
+    def username(self):
+        return self.config.user.username
+
+    @property
+    def fname(self) -> str:
+        return self.config.forum.fname
 
     @classmethod
     async def create(cls, config: UserConfig):
@@ -97,21 +117,34 @@ class User:
 
     async def stop(self, _: None = None):
         [i.un_register() for i in self.listeners]
+        self.listeners.clear()
 
         if isinstance(self.client, TiebaClient):
             await self.client.stop()
 
-    async def update_config(self, config: UserConfig):
-        # TODO 判断输入的bduss, stoken是否有效（是否被马赛克）
-        self.config = config
-        self.processer = Processer(config)
-        if self.config.forum.login_ready:
-            self.client = await TiebaClient.create(self.config.forum.bduss, self.config.forum.stoken)
+    async def update_config(self, new_config: UserConfig):
+        old_config = self.config
+        self.config = new_config
+
+        self.processer = Processer(new_config)
+        if new_config.forum.login_ready and (
+            new_config.forum.bduss != old_config.forum.bduss or new_config.forum.stoken != old_config.forum.stoken
+        ):
+            self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken)
             if isinstance(self.client, TiebaClientEmpty):
                 # TODO 在这里添加登录失败提示
                 pass
         else:
             self.client = TiebaClientEmpty()
+
+        if old_config.process.confirm_expire != new_config.process.confirm_expire:
+            self.confirm.save_data()
+            self.confirm = ConfirmCache(self.dir, expire=new_config.process.confirm_expire)
+
+        self.save_config()
+
+    def save_config(self):
+        write_config(self.config, self.dir / User.CONFIG_FILE)
 
     async def process(self, content: Content):
         obj = ProcessObject(content)
@@ -144,16 +177,19 @@ class User:
                 raise ValueError(f"Unknown operation: {operations}")
         else:
             for operation in operations:
-                if operation.type == "Delete":
+                if operation.type == "delete":
+                    if operation.options.delete_thread_if_author:
+                        # TODO db查询，完成功能适配
+                        pass
                     await self.client.delete(obj.content)
-                elif operation.type == "Block":
+                elif operation.type == "block":
                     await self.client.block(
                         obj.content,
                         operation.options.day or self.config.forum.block_day,
                         operation.options.reason or self.config.forum.block_reason,
                     )
-                elif operation.type == "AuthorDelete":
-                    # TODO db查询，完成功能适配
+                else:
+                    # log不支持的处理
                     pass
 
     async def operate_rule_set(self, obj: ProcessObject, rule_set: RuleSet):
@@ -165,6 +201,7 @@ class User:
                 await self.operate(obj, og)
 
             og = rule_set.operations.no_direct_operations
+            # TODO 在这里储存所需的数据
             if og:
                 self.confirm.set(
                     obj.content.pid,

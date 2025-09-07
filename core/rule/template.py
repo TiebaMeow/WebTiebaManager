@@ -1,5 +1,6 @@
 import abc
 import re
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -43,6 +44,7 @@ class TextOptions(BaseModel):
 
 
 class TextRule(ContentRuleTemplate, RuleTemplate):
+    _series = "text"
     options: TextOptions
 
     async def _raw_check(self, value: str | None) -> bool:
@@ -79,9 +81,10 @@ class LimiterOptions(BaseModel):
 
 
 class LimiterRule(ContentRuleTemplate, RuleTemplate):
+    _series = "limiter"
     options: LimiterOptions
 
-    async def _raw_check(self, value: int) -> bool:
+    async def _raw_check(self, value: float) -> bool:
         if self.options.max is not None and value > self.options.max:
             return False
         if self.options.min is not None and value < self.options.min:
@@ -89,18 +92,57 @@ class LimiterRule(ContentRuleTemplate, RuleTemplate):
         return True
 
 
-class CheckBoxOptions[T](BaseModel):
-    value: list[T]
+class TimeOptions(BaseModel):
+    start: str | None = None
+    end: str | None = None
+    _start_timestamp: float | None = None
+    _end_timestamp: float | None = None
 
     @property
     def valid(self) -> bool:
-        return bool(self.value)
+        return bool(self.start or self.end)
+
+    @staticmethod
+    def strptime(time_string: str):
+        return datetime.strptime(time_string, "%Y-%m-%d %H:%M:%S").timestamp()
 
     def model_post_init(self, context) -> None:
-        self._set = set(getattr(self, "value", []))
+        try:
+            if self.start:
+                self._start_timestamp = self.strptime(self.start)
+            if self.end:
+                self._end_timestamp = self.strptime(self.end)
+        except ValueError as e:
+            raise ValueError("时间规则格式错误，请检查配置文件") from e
+
+
+class TimeRule(ContentRuleTemplate, RuleTemplate):
+    _series = "time"
+    options: TimeOptions
+
+    async def _raw_check(self, value: int | float | str) -> bool:
+        if isinstance(value, str):
+            value = TimeOptions.strptime(value)
+        if self.options._end_timestamp is not None and value > self.options._end_timestamp:
+            return False
+        if self.options._start_timestamp is not None and value < self.options._start_timestamp:
+            return False
+        return True
+
+
+class CheckBoxOptions[T](BaseModel):
+    values: list[T]
+
+    @property
+    def valid(self) -> bool:
+        return bool(self.values)
+
+    def model_post_init(self, context) -> None:
+        self._set = set(getattr(self, "values", []))
 
 
 class CheckBoxRule[T](ContentRuleTemplate, RuleTemplate):
+    _series = "checkbox"
     options: CheckBoxOptions[T]
 
     async def _raw_check(self, value: T) -> bool:
@@ -116,6 +158,7 @@ class SelectOption[T](BaseModel):
 
 
 class SelectRule[T](ContentRuleTemplate, RuleTemplate):
+    _series = "select"
     options: SelectOption[T]
 
     async def _raw_check(self, value: T) -> bool:

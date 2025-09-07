@@ -128,8 +128,12 @@ async def get_current_user(data: Annotated[tuple[User, bool], Depends(parse_toke
     return data[0]
 
 
-async def get_system_acess(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
+async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
     return data[1]
+
+
+current_user_depends = Annotated[User, Depends(get_current_user)]
+system_access_depends = Annotated[bool, Depends(get_system_access)]
 
 
 @app.post("/api/login", tags=["token"])
@@ -141,7 +145,7 @@ async def login_for_access_token(
     access_token_expires = timedelta(days=Controller.config.server.token_expire_days)
     access_token = create_access_token(
         data=TokenData(
-            username=user.config.user.username,
+            username=user.username,
             password_last_update=user.config.user.password_last_update,
             key_last_update=Controller.config.server.key_last_update if system_access else None,
         ).serialize(),
