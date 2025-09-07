@@ -233,6 +233,7 @@ class User:
                 obj = ProcessObject(confirm.content, confirm.data)
                 og = OperationGroup.deserialize(confirm.operations)  # type: ignore
                 await self.operate(obj, og)
+                self.confirm.delete(confirm.content.pid)
                 return True
             else:
                 raise ValueError("Invalid action")
