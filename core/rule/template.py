@@ -95,8 +95,8 @@ class LimiterRule(ContentRuleTemplate, RuleTemplate):
 class TimeOptions(BaseModel):
     start: str | None = None
     end: str | None = None
-    _start_timestamp: float | None
-    _end_timestamp: float | None
+    _start_timestamp: float | None = None
+    _end_timestamp: float | None = None
 
     @property
     def valid(self) -> bool:
