@@ -98,7 +98,7 @@ class UserManager:
         return await cls.change_user_status(username, True)
 
     @classmethod
-    async def disbale_user(cls, username: str):
+    async def disable_user(cls, username: str):
         return await cls.change_user_status(username, False)
 
 

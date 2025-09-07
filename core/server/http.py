@@ -83,7 +83,7 @@ async def enable_user(user: current_user_depends) -> BaseResponse[bool]:
 
 @app.post("/api/user/disable", tags=["user"])
 async def disable_user(user: current_user_depends) -> BaseResponse[bool]:
-    return BaseResponse(data=await UserManager.disbale_user(user.username))
+    return BaseResponse(data=await UserManager.disable_user(user.username))
 
 
 class UserConfigData(BaseModel):
