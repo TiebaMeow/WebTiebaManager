@@ -27,10 +27,10 @@ class ExpireCache[T]:
         self.path = path
 
         if clear_after_set:
-            raw_set = self.set
 
             def set_(key: ExpireCache.POSSIBLE_KEY, data: T):
-                raw_set(key, data)
+                # 自动调用当前实例的 set 方法（支持子类重写）
+                type(self).set(self, key, data)
                 self.clean()
 
             self.set = set_
