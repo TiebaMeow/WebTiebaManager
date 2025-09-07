@@ -135,15 +135,6 @@ async def get_confirm_list(user: current_user_depends) -> BaseResponse[list[Conf
     )
 
 
-def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
-    if image is None or not image.any():
-        image_bytes = b""
-    else:
-        image_bytes = cv2.imencode(".webp", image)[1].tobytes()
-
-    return io.BytesIO(image_bytes)
-
-
 class ConfirmRequest(BaseModel):
     pid: int | list[int]
     action: Literal["ignore", "execute"]
@@ -169,6 +160,15 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
     else:
         asyncio.create_task(confirm_many(user, request.pid, request.action))
         return BaseResponse(data=True, message="正在批量执行操作，请稍后查看结果")
+
+
+def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
+    if image is None or not image.any():
+        image_bytes = b""
+    else:
+        image_bytes = cv2.imencode(".webp", image)[1].tobytes()
+
+    return io.BytesIO(image_bytes)
 
 
 @app.get("/resources/portrait/{portrait}", tags=["resources"])
