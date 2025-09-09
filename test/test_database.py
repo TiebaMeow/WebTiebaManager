@@ -94,96 +94,101 @@ async def test_save_and_get_ignore(setup_db):
     got2 = await Database.get_contents_by_pids([1, 2, 3])
     assert {c.pid for c in got2} == {1, 2, 3}
 
-    @pytest.mark.asyncio
-    async def test_save_items_empty(setup_db):
-        # 空列表不应报错
-        await Database.save_items([], on_conflict="ignore")
 
-    @pytest.mark.asyncio
-    async def test_save_items_chunk_none_or_nonpositive(setup_db):
-        items = [make_content(100), make_content(101)]
-        await Database.delete_contents_by_pids([100, 101])
-        # chunk_size=None
-        await Database.save_items(items, on_conflict="ignore", chunk_size=None)
-        got = await Database.get_contents_by_pids([100, 101])
-        assert {c.pid for c in got} == {100, 101}
-        # 再清理
-        await Database.delete_contents_by_pids([100, 101])
-        # chunk_size<=0
-        await Database.save_items(items, on_conflict="ignore", chunk_size=0)
-        got = await Database.get_contents_by_pids([100, 101])
-        assert {c.pid for c in got} == {100, 101}
+@pytest.mark.asyncio
+async def test_save_items_empty(setup_db):
+    # 空列表不应报错
+    await Database.save_items([], on_conflict="ignore")
 
-    @pytest.mark.asyncio
-    async def test_upsert_with_exclude_all_nonpk_no_update(setup_db):
-        # exclude 所有非主键列 -> 回退为 ignore，不应改变已有值
-        updated = make_content(1)
-        updated.text = "should-not-change"
-        # 列出所有非主键列（与模型保持一致）
-        exclude_cols = [
-            "tid",
-            "fname",
-            "create_time",
-            "title",
-            "text",
-            "floor",
-            "images",
-            "type",
-            "author_id",
-        ]
-        await Database.save_items([updated], on_conflict="upsert", exclude_columns=exclude_cols)
-        got = (await Database.get_contents_by_pids([1]))[0]
-        assert got.text != "should-not-change"
 
-    def test_mixed_model_raise_type_error():
-        from core.db.models import ForumModel
+@pytest.mark.asyncio
+async def test_save_items_chunk_none_or_nonpositive(setup_db):
+    items = [make_content(100), make_content(101)]
+    await Database.delete_contents_by_pids([100, 101])
+    # chunk_size=None
+    await Database.save_items(items, on_conflict="ignore", chunk_size=None)
+    got = await Database.get_contents_by_pids([100, 101])
+    assert {c.pid for c in got} == {100, 101}
+    # 再清理
+    await Database.delete_contents_by_pids([100, 101])
+    # chunk_size<=0
+    await Database.save_items(items, on_conflict="ignore", chunk_size=0)
+    got = await Database.get_contents_by_pids([100, 101])
+    assert {c.pid for c in got} == {100, 101}
 
-        f = ForumModel(fname="f", fid=1)
-        c = make_content(999)
-        with pytest.raises(TypeError):
-            # 混合模型类型应报错
-            asyncio.get_event_loop().run_until_complete(Database.save_items([f, c]))  # type: ignore
 
-    @pytest.mark.skipif("RUN_DB_INTEGRATION" not in __import__("os").environ, reason="integration only")
-    @pytest.mark.asyncio
-    async def test_mysql_and_pg_integration(tmp_path_factory):
-        import os
+@pytest.mark.asyncio
+async def test_upsert_with_exclude_all_nonpk_no_update(setup_db):
+    # exclude 所有非主键列 -> 回退为 ignore，不应改变已有值
+    updated = make_content(1)
+    updated.text = "should-not-change"
+    # 列出所有非主键列（与模型保持一致）
+    exclude_cols = [
+        "tid",
+        "fname",
+        "create_time",
+        "title",
+        "text",
+        "floor",
+        "images",
+        "type",
+        "author_id",
+    ]
+    await Database.save_items([updated], on_conflict="upsert", exclude_columns=exclude_cols)
+    got = (await Database.get_contents_by_pids([1]))[0]
+    assert got.text != "should-not-change"
 
-        from core.db.config import DatabaseConfig
 
-        # MySQL
-        mysql_cfg = DatabaseConfig(
-            type="mysql",
-            username=os.environ["MYSQL_USER"],
-            password=os.environ["MYSQL_PASSWORD"],
-            host=os.environ["MYSQL_HOST"],
-            port=int(os.environ["MYSQL_PORT"]),
-            db=os.environ["MYSQL_DB"],
-        )
-        dbi.Controller.config = types.SimpleNamespace(database=mysql_cfg)  # type: ignore
-        await Database.startup()
-        await Database.save_items([make_content(3001)], on_conflict="upsert")
-        got = await Database.get_contents_by_pids([3001])
-        assert got
-        assert got[0].pid == 3001
-        await Database.teardown()
+def test_mixed_model_raise_type_error():
+    from core.db.models import ForumModel
 
-        # PostgreSQL
-        pg_cfg = DatabaseConfig(
-            type="postgresql",
-            username=os.environ["PG_USER"],
-            password=os.environ["PG_PASSWORD"],
-            host=os.environ["PG_HOST"],
-            port=int(os.environ["PG_PORT"]),
-            db=os.environ["PG_DB"],
-        )
-        dbi.Controller.config = types.SimpleNamespace(database=pg_cfg)  # type: ignore
-        await Database.startup()
-        await Database.save_items([make_content(4001)], on_conflict="upsert")
-        got = await Database.get_contents_by_pids([4001])
-        assert got
-        assert got[0].pid == 4001
-        await Database.teardown()
+    f = ForumModel(fname="f", fid=1)
+    c = make_content(999)
+    with pytest.raises(TypeError):
+        # 混合模型类型应报错
+        asyncio.get_event_loop().run_until_complete(Database.save_items([f, c]))  # type: ignore
+
+
+@pytest.mark.skipif("RUN_DB_INTEGRATION" not in __import__("os").environ, reason="integration only")
+@pytest.mark.asyncio
+async def test_mysql_and_pg_integration(tmp_path_factory):
+    import os
+
+    from core.db.config import DatabaseConfig
+
+    # MySQL
+    mysql_cfg = DatabaseConfig(
+        type="mysql",
+        username=os.environ["MYSQL_USER"],
+        password=os.environ["MYSQL_PASSWORD"],
+        host=os.environ["MYSQL_HOST"],
+        port=int(os.environ["MYSQL_PORT"]),
+        db=os.environ["MYSQL_DB"],
+    )
+    dbi.Controller.config = types.SimpleNamespace(database=mysql_cfg)  # type: ignore
+    await Database.startup()
+    await Database.save_items([make_content(3001)], on_conflict="upsert")
+    got = await Database.get_contents_by_pids([3001])
+    assert got
+    assert got[0].pid == 3001
+    await Database.teardown()
+
+    # PostgreSQL
+    pg_cfg = DatabaseConfig(
+        type="postgresql",
+        username=os.environ["PG_USER"],
+        password=os.environ["PG_PASSWORD"],
+        host=os.environ["PG_HOST"],
+        port=int(os.environ["PG_PORT"]),
+        db=os.environ["PG_DB"],
+    )
+    dbi.Controller.config = types.SimpleNamespace(database=pg_cfg)  # type: ignore
+    await Database.startup()
+    await Database.save_items([make_content(4001)], on_conflict="upsert")
+    got = await Database.get_contents_by_pids([4001])
+    assert got
+    assert got[0].pid == 4001
+    await Database.teardown()
 
 
 @pytest.mark.asyncio
