@@ -8,6 +8,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "aiosqlite>=0.21.0",
     "aiotieba>=4.6.0",
+    "apscheduler>=3.11.0",
     "asyncmy>=0.2.10",
     "asyncpg>=0.30.0",
     "cashews[diskcache]>=7.4.1",

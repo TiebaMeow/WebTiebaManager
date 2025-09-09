@@ -1,7 +1,7 @@
-import asyncio
-from datetime import datetime
 from pathlib import Path
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from cashews import Cache
 from cashews.backends.interface import NOT_EXIST, UNLIMITED
 
@@ -13,53 +13,46 @@ ClearCache = AsyncEvent[None]()
 
 
 class CacheCleaner:
+    _clear_cache_scheduler: AsyncIOScheduler | None = None
     _clear_cache_time: str = "04:00"
-    _clear_cache_task = None
 
     @classmethod
-    async def clear_cache_loop(cls):
-        clear_cache_time = cls._clear_cache_time
-        while True:
-            now = datetime.now()
-            target = now.replace(
-                hour=int(clear_cache_time.split(":")[0]),
-                minute=int(clear_cache_time.split(":")[1]),
-                second=0,
-                microsecond=0,
-            )
-            if now > target:
-                target = target.replace(day=now.day + 1)
-                try:
-                    target = target.replace(day=now.day + 1)
-                except ValueError:
-                    # 跨月处理
-                    if now.month == 12:
-                        target = target.replace(year=now.year + 1, month=1, day=1)
-                    else:
-                        target = target.replace(month=now.month + 1, day=1)
+    def initialize(cls):
+        if cls._clear_cache_scheduler is None or cls._clear_cache_scheduler.state == 0:
+            cls._clear_cache_scheduler = AsyncIOScheduler()
 
-            wait_seconds = (target - now).total_seconds()
-            await asyncio.sleep(wait_seconds)
-            await ClearCache.broadcast(None)
+    @classmethod
+    async def clear_cache(cls):
+        await ClearCache.broadcast(None)
+
+    @classmethod
+    def setup_job(cls):
+        hour, minute = map(int, cls._clear_cache_time.split(":"))
+        cls._clear_cache_scheduler.add_job(  # type: ignore
+            cls.clear_cache,
+            trigger=CronTrigger(hour=hour, minute=minute),
+            id="clear_cache_job",
+            replace_existing=True,
+            executor="default",
+            misfire_grace_time=300,
+        )
 
     @classmethod
     def start(cls, _=None):
-        cls._clear_cache_time = Controller.config.cleanup_time
-        cls._clear_cache_task = asyncio.create_task(cls.clear_cache_loop())
+        cls.initialize()
+        cls.setup_job()
+        cls._clear_cache_scheduler.start()  # type: ignore
 
     @classmethod
     def stop(cls, _=None):
-        if cls._clear_cache_task:
-            cls._clear_cache_task.cancel()
-            cls._clear_cache_task = None
+        if cls._clear_cache_scheduler and cls._clear_cache_scheduler.running:
+            cls._clear_cache_scheduler.shutdown()
 
     @classmethod
     def update_clear_cache_time(cls, _=None):
         if Controller.config.cleanup_time != cls._clear_cache_time:
             cls._clear_cache_time = Controller.config.cleanup_time
-            if cls._clear_cache_task:
-                cls._clear_cache_task.cancel()
-                cls._clear_cache_task = asyncio.create_task(cls.clear_cache_loop())
+            cls.setup_job()
 
 
 Controller.Start.on(CacheCleaner.start)
