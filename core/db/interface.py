@@ -82,6 +82,22 @@ class Database:
             )
             return result.scalars().first()
 
+    @classmethod
+    async def iter_all_contents(cls) -> AsyncGenerator[ContentModel, None]:
+        async with cls.get_session() as session:
+            result = await session.stream(select(ContentModel))
+            async for row in result.scalars():
+                yield row
+
+    @classmethod
+    async def delete_contents_by_pids(cls, pids: Iterable[int]) -> None:
+        pid_list = list(pids)
+        if not pid_list:
+            return
+        async with cls.get_session() as session:
+            await session.execute(delete(ContentModel).where(ContentModel.pid.in_(pid_list)))
+            await session.commit()
+
 
 Controller.Start.on(Database.startup)
 Controller.Stop.on(Database.teardown)

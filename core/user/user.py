@@ -138,6 +138,8 @@ class User:
         if isinstance(self.client, TiebaClient):
             await self.client.stop()
 
+        self.confirm.stop()
+
     async def update_config(self, new_config: UserConfig):
         old_config = self.config
         self.config = new_config

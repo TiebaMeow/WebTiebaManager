@@ -2,15 +2,25 @@ import asyncio
 
 import aiotieba
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 
 from core.constance import BASE_DIR, PID_CACHE_EXPIRE
 from core.control import Controller
+from core.db.interface import ContentModel, Database
 from core.typedef import Comment, Post, Thread
 from core.user.manager import UserManager
-from core.util.cache import ExpireCache
+from core.util.cache import ClearCache, ExpireCache
 from core.util.tools import EtaSleep
 
 from .browser import TiebaBrowser
+
+
+@ClearCache.on
+async def clear_content_cache(_=None):
+    need_clear: list[int] = [
+        content.pid async for content in Database.iter_all_contents() if Spider.cache.get(content.pid) is None
+    ]
+    await Database.delete_contents_by_pids(need_clear)
 
 
 class CrawlNeed(BaseModel):
@@ -172,16 +182,21 @@ class Crawler:
 
     @classmethod
     async def crawl(cls):
-        try:
-            while True:
+        while True:
+            try:
                 for forum, need in cls.needs.items():
                     async for content in cls.spider.crawl(forum, need):
-                        await Controller.DispatchContent.broadcast(content)
-                await asyncio.sleep(Controller.config.scan.loop_cd)
-        except Exception:
-            from traceback import format_exc
+                        try:
+                            await Database.save_items([ContentModel.from_content(content)])
+                        except IntegrityError:
+                            pass
 
-            print(format_exc())
+                        await Controller.DispatchContent.broadcast(content)
+            except Exception:
+                from traceback import format_exc
+
+                print(format_exc())
+            await asyncio.sleep(Controller.config.scan.loop_cd)
 
     @classmethod
     async def start(cls):

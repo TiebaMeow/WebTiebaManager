@@ -15,6 +15,7 @@ from core.rule.rule_set import RuleSetConfig
 from core.user.config import ForumConfig, ProcessConfig
 from core.user.confirm import ConfirmSimpleData
 from core.user.manager import User, UserManager
+from core.util.cache import ClearCache
 
 from .server import BaseResponse, app
 from .token import current_user_depends
@@ -160,6 +161,12 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
     else:
         asyncio.create_task(confirm_many(user, request.pid, request.action))
         return BaseResponse(data=True, message="正在批量执行操作，请稍后查看结果")
+
+
+@app.post("/api/cache/clear", tags=["cache"], description="手动清理缓存")
+async def clear_confirms(user: current_user_depends) -> BaseResponse[bool]:
+    await ClearCache.broadcast(None)
+    return BaseResponse(data=True, message="操作成功")
 
 
 def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
