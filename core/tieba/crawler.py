@@ -26,7 +26,7 @@ class CrawlNeed(BaseModel):
         )
 
 
-class Crawler:
+class Spider:
     CACHE_DIR = BASE_DIR / "crawler_cache"
     cache: ExpireCache[int | str] = ExpireCache(directory=CACHE_DIR, expire_time=PID_CACHE_EXPIRE)
 
@@ -47,20 +47,18 @@ class Crawler:
         self.eta = EtaSleep(Controller.config.scan.query_cd)
 
     async def init_client(self):
-        if not self.client:
+        if self.client is None:
             self.client = aiotieba.Client()
             await self.client.__aenter__()
-
-        if not self.browser:
+        if self.browser is None:
             self.browser = TiebaBrowser()
             await self.browser.__aenter__()
 
     async def stop_client(self):
-        if self.client:
+        if self.client is not None:
             await self.client.__aexit__()
             self.client = None  # type: ignore
-
-        if self.browser:
+        if self.browser is not None:
             await self.browser.__aexit__()
             self.browser = None  # type: ignore
 
@@ -68,19 +66,18 @@ class Crawler:
         if need is None:
             need = CrawlNeed()
         await self.init_client()
-
         scan = Controller.config.scan
         raw_threads: list[aiotieba.typing.Thread] = []
+        # 获取主题列表
         for i in range(1, scan.thread_page_forward + 1):
             async with self.eta:
-                threads = await self.client.get_threads(forum, pn=i)
-                raw_threads.extend(threads)
+                raw_threads.extend(await self.client.get_threads(forum, pn=i))
 
         for thread in raw_threads:
-            updated = False
             thread_mark = f"{thread.last_time}.{thread.reply_num}"
-            if (cache_thread_mark := self.cache.get(thread.pid)) is None:
-                updated = thread.reply_num > 0
+            cache_thread_mark = self.cache.get(thread.pid)
+            updated = (cache_thread_mark is None and thread.reply_num > 0) or (thread_mark != cache_thread_mark)
+            if cache_thread_mark is None and thread.reply_num > 0:
                 yield Thread.from_aiotieba_data(thread)
             elif thread_mark != cache_thread_mark:
                 updated = True
@@ -93,46 +90,36 @@ class Crawler:
             raw_comments: list[Comment] = []
             reply_num_dict: dict[int, int] = {}
 
-            async def get_posts(pn):
-                data = await self.browser.get_posts(thread.tid, pn=pn)  # noqa: B023
-                raw_posts.extend(data.posts)  # noqa: B023
-                raw_comments.extend(data.comments)  # noqa: B023
-                reply_num_dict.update(data.reply_num)  # noqa: B023
-                return data
-
             async with self.eta:
-                data = await get_posts(1)
+                data = await self.browser.get_posts(thread.tid, pn=1)
 
-                if data.total_page < scan.post_page_forward + scan.post_page_backward:
-                    for i in range(2, data.total_page + 1):
-                        async with self.eta:
-                            await get_posts(i)
+                total_page = data.total_page
+                # 优化页码遍历逻辑
+                pages = list(range(2, min(scan.post_page_forward + 1, total_page + 1)))
+                if total_page < scan.post_page_forward + scan.post_page_backward:
+                    pages += list(range(len(pages) + 2, total_page + 1))
                 else:
-                    for i in range(2, scan.post_page_forward + 1):
-                        async with self.eta:
-                            await get_posts(i)
-                    for i in range(
-                        data.total_page,
-                        data.total_page - scan.post_page_backward,
-                        -1,
-                    ):
-                        async with self.eta:
-                            await get_posts(i)
+                    pages += list(
+                        range(total_page, max(total_page - scan.post_page_backward, scan.post_page_forward), -1)
+                    )
+
+                for i in pages:
+                    async with self.eta:
+                        data = await self.browser.get_posts(thread.tid, pn=i)
+                        raw_posts.extend(data.posts)
+                        raw_comments.extend(data.comments)
+                        reply_num_dict.update(data.reply_num)
 
             self.cache.set(thread.pid, thread_mark)
 
             for post in raw_posts:
-                reply_num = reply_num_dict.get(post.pid, 0)
-
                 if post.floor == 1:
-                    # 跳过一楼 （与主题帖相同
                     continue
-                updated = False
-
-                if (reply_num_cache := self.cache.get(post.pid)) is None:
-                    updated = reply_num > 4
-                    if need.post:
-                        yield post
+                reply_num = reply_num_dict.get(post.pid, 0)
+                reply_num_cache = self.cache.get(post.pid)
+                updated = (reply_num_cache is None and reply_num > 4) or (reply_num != reply_num_cache)
+                if reply_num_cache is None and reply_num > 4 and need.post:
+                    yield post
                 elif reply_num != reply_num_cache:
                     updated = True
 
@@ -140,41 +127,32 @@ class Crawler:
                     self.cache.set(post.pid, reply_num)
                     continue
 
-                target_pn = reply_num // 30 + 1 if reply_num % 30 != 0 else reply_num // 30
+                target_pn = (reply_num + 29) // 30
                 async with self.eta:
-                    raw_comments.extend(
-                        Comment.from_aiotieba_data(i, title=thread.title)
-                        for i in await self.client.get_comments(post.tid, post.pid, pn=target_pn)
-                    )
+                    comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
+                    raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
 
                 self.cache.set(post.pid, reply_num)
 
                 for comment in raw_comments:
                     if self.cache.get(comment.pid) is None:
                         yield comment
-
                     self.cache.set(comment.pid, 1)
 
 
-class CrawlerManager:
-    crawler = Crawler()
+class Crawler:
+    spider = Spider()
     needs: dict[str, CrawlNeed] = {}
     task: asyncio.Task | None = None
 
     @classmethod
     async def update_needs(cls, _=None):
         new_needs = {}
-
         for user in UserManager.users.values():
             forum = user.config.forum
-
             if user.enable and forum and user.config.rule_sets and forum.fname:
                 need = CrawlNeed(thread=forum.thread, post=forum.post, comment=forum.comment)
-                if forum.fname in new_needs:
-                    new_needs[forum.fname] += need
-                else:
-                    new_needs[forum.fname] = need
-
+                new_needs[forum.fname] = new_needs.get(forum.fname, CrawlNeed()) + need
         cls.needs = new_needs
         await cls.start_or_stop()
 
@@ -182,7 +160,7 @@ class CrawlerManager:
     async def start_or_stop(cls, _: None = None):
         if cls.needs and not cls.task and Controller.running:
             cls.task = asyncio.create_task(cls.crawl())
-        if (not cls.needs or not Controller.running) and cls.task:
+        elif (not cls.needs or not Controller.running) and cls.task:
             cls.task.cancel()
             cls.task = None
 
@@ -197,7 +175,7 @@ class CrawlerManager:
         try:
             while True:
                 for forum, need in cls.needs.items():
-                    async for content in cls.crawler.crawl(forum, need):
+                    async for content in cls.spider.crawl(forum, need):
                         await Controller.DispatchContent.broadcast(content)
                 await asyncio.sleep(Controller.config.scan.loop_cd)
         except Exception:
@@ -207,10 +185,10 @@ class CrawlerManager:
 
     @classmethod
     async def start(cls):
-        await cls.crawler.init_client()
+        await cls.spider.init_client()
 
 
-UserManager.UserChange.on(CrawlerManager.update_needs)
-UserManager.UserConfigChange.on(CrawlerManager.update_needs)
-Controller.SystemConfigChange.on(CrawlerManager.restart)
-Controller.Stop.on(CrawlerManager.start_or_stop)
+UserManager.UserChange.on(Crawler.update_needs)
+UserManager.UserConfigChange.on(Crawler.update_needs)
+Controller.SystemConfigChange.on(Crawler.restart)
+Controller.Stop.on(Crawler.start_or_stop)
