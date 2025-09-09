@@ -25,11 +25,7 @@ class ExpireCache[T]:
             return self.deserialize_data(data)
 
     def delete(self, key) -> bool:
-        try:
-            self.cache.delete(key)
-            return True
-        except KeyError:
-            return False
+        return self.cache.delete(key)
 
     def expire(self) -> int:
         return self.cache.expire()
