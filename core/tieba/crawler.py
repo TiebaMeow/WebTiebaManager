@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 
 import aiotieba
@@ -18,7 +20,7 @@ from .browser import TiebaBrowser
 @ClearCache.on
 async def clear_content_cache(_=None):
     need_clear: list[int] = [
-        content.pid async for content in Database.iter_all_contents() if Spider.cache.get(content.pid) is None
+        content.pid async for content in Database.iter_all_contents() if await Spider.cache.get(content.pid) is None
     ]
     await Database.delete_contents_by_pids(need_clear)
 
@@ -28,7 +30,7 @@ class CrawlNeed(BaseModel):
     post: bool = True
     comment: bool = True
 
-    def __add__(self, other: "CrawlNeed"):
+    def __add__(self, other: CrawlNeed):
         return CrawlNeed(
             thread=self.thread or other.thread,
             post=self.post or other.post,

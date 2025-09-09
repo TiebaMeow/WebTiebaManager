@@ -18,7 +18,7 @@ class CacheCleaner:
 
     @classmethod
     def initialize(cls):
-        if cls._clear_cache_scheduler is None or cls._clear_cache_scheduler.state == 0:
+        if cls._clear_cache_scheduler is None:
             cls._clear_cache_scheduler = AsyncIOScheduler()
 
     @classmethod
@@ -63,6 +63,11 @@ Controller.SystemConfigChange.on(CacheCleaner.update_clear_cache_time)
 class ExpireCache[T]:
     """
     cashews 封装，兼容原有接口
+
+    Attributes:
+        directory (Path | None): 磁盘缓存路径，为 None 则使用内存缓存
+        expire_time (int | None): 缓存过期时间，为 None 则不设置过期时间
+        mem_max_size (int): 内存缓存最大数量，仅在 directory 为 None 时生效
     """
 
     def __init__(self, directory: Path | None = None, *, expire_time: int | None = 86400, mem_max_size: int = 10000):
