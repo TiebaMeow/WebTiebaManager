@@ -1,11 +1,9 @@
-import asyncio
-import time
-from collections.abc import Callable
-from datetime import datetime
-from functools import wraps
 from pathlib import Path
 
-import diskcache
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from cashews import Cache
+from cashews.backends.interface import NOT_EXIST, UNLIMITED
 
 from core.control import Controller
 
@@ -15,53 +13,46 @@ ClearCache = AsyncEvent[None]()
 
 
 class CacheCleaner:
+    _clear_cache_scheduler: AsyncIOScheduler | None = None
     _clear_cache_time: str = "04:00"
-    _clear_cache_task = None
 
     @classmethod
-    async def clear_cache_loop(cls):
-        clear_cache_time = cls._clear_cache_time
-        while True:
-            now = datetime.now()
-            target = now.replace(
-                hour=int(clear_cache_time.split(":")[0]),
-                minute=int(clear_cache_time.split(":")[1]),
-                second=0,
-                microsecond=0,
-            )
-            if now > target:
-                target = target.replace(day=now.day + 1)
-                try:
-                    target = target.replace(day=now.day + 1)
-                except ValueError:
-                    # 跨月处理
-                    if now.month == 12:
-                        target = target.replace(year=now.year + 1, month=1, day=1)
-                    else:
-                        target = target.replace(month=now.month + 1, day=1)
+    def initialize(cls):
+        if cls._clear_cache_scheduler is None:
+            cls._clear_cache_scheduler = AsyncIOScheduler()
 
-            wait_seconds = (target - now).total_seconds()
-            await asyncio.sleep(wait_seconds)
-            await ClearCache.broadcast(None)
+    @classmethod
+    async def clear_cache(cls):
+        await ClearCache.broadcast(None)
+
+    @classmethod
+    def setup_job(cls):
+        hour, minute = map(int, cls._clear_cache_time.split(":"))
+        cls._clear_cache_scheduler.add_job(  # type: ignore
+            cls.clear_cache,
+            trigger=CronTrigger(hour=hour, minute=minute),
+            id="clear_cache_job",
+            replace_existing=True,
+            executor="default",
+            misfire_grace_time=300,
+        )
 
     @classmethod
     def start(cls, _=None):
-        cls._clear_cache_time = Controller.config.cleanup_time
-        cls._clear_cache_task = asyncio.create_task(cls.clear_cache_loop())
+        cls.initialize()
+        cls.setup_job()
+        cls._clear_cache_scheduler.start()  # type: ignore
 
     @classmethod
     def stop(cls, _=None):
-        if cls._clear_cache_task:
-            cls._clear_cache_task.cancel()
-            cls._clear_cache_task = None
+        if cls._clear_cache_scheduler and cls._clear_cache_scheduler.running:
+            cls._clear_cache_scheduler.shutdown()
 
     @classmethod
     def update_clear_cache_time(cls, _=None):
         if Controller.config.cleanup_time != cls._clear_cache_time:
             cls._clear_cache_time = Controller.config.cleanup_time
-            if cls._clear_cache_task:
-                cls._clear_cache_task.cancel()
-                cls._clear_cache_task = asyncio.create_task(cls.clear_cache_loop())
+            cls.setup_job()
 
 
 Controller.Start.on(CacheCleaner.start)
@@ -71,63 +62,55 @@ Controller.SystemConfigChange.on(CacheCleaner.update_clear_cache_time)
 
 class ExpireCache[T]:
     """
-    dickcache 封装，兼容原有接口
+    cashews 封装，兼容原有接口
+
+    Attributes:
+        directory (Path | None): 磁盘缓存路径，为 None 则使用内存缓存
+        expire_time (int | None): 缓存过期时间，为 None 则不设置过期时间
+        mem_max_size (int): 内存缓存最大数量，仅在 directory 为 None 时生效
     """
 
-    def __init__(self, directory: str | Path, expire_time: int = 86400):
+    def __init__(self, directory: Path | None = None, *, expire_time: int | None = 86400, mem_max_size: int = 10000):
+        self.cache = Cache()
         self.expire_time = expire_time
-        self.cache = diskcache.Cache(directory=directory)
+        if directory is None:
+            self.cache.setup(f"mem://?size={mem_max_size}")
+        else:
+            directory_str = directory.resolve().as_posix()
+            self.cache.setup(f"disk://?shards=0&directory={directory_str}")
         self.listener = ClearCache.on(self.expire)
 
-    def stop(self):
+    async def stop(self):
         self.listener.un_register()
-        self.cache.close()
+        await self.cache.close()
 
-    def set(self, key, data: T):
-        self.cache.set(key, self.serialize_data(data), expire=self.expire_time)
+    async def set(self, key, data: T):
+        await self.cache.set(key, self.serialize_data(data), expire=self.expire_time)
 
-    def get(self, key) -> T | None:
-        data = self.cache.get(key, default=None)
+    async def get(self, key) -> T | None:
+        data = await self.cache.get(key, default=None)
         if data is not None:
             return self.deserialize_data(data)
+        return None
 
-    def delete(self, key) -> bool:
-        return self.cache.delete(key)
+    async def delete(self, key) -> bool:
+        return await self.cache.delete(key)
 
-    def expire(self, _=None):
-        self.cache.expire()
+    async def expire(self, _=None) -> None:
+        expired_keys = set()
+        async for key in self.cache.scan("*"):
+            expire = await self.cache.get_expire(key)
+            if expire == NOT_EXIST:
+                expired_keys.add(key)
+        if expired_keys:
+            await self.cache.delete(*expired_keys)
 
-    def clear(self) -> None:
-        self.cache.clear()
+    async def clear(self) -> None:
+        await self.cache.clear()
 
-    def wrap(self, func: Callable[..., T]) -> Callable[..., T]:
-        if asyncio.iscoroutinefunction(func):
-
-            @wraps(func)
-            async def async_wrapper(*args, **kwargs) -> T:
-                key = f"{func.__name__}_{args}_{kwargs}"
-                if (data := self.get(key)) is not None:
-                    return data
-                result = await func(*args, **kwargs)
-                self.set(key, result)
-                return result
-
-            return async_wrapper  # type: ignore
-        else:
-
-            @wraps(func)
-            def wrapper(*args, **kwargs) -> T:
-                key = f"{func.__name__}_{args}_{kwargs}"
-                if (data := self.get(key)) is not None:
-                    return data
-                result = func(*args, **kwargs)
-                self.set(key, result)
-                return result
-
-            return wrapper
-
-    def set_expire_time(self, new_expire_time: int):
-        expire_delta = new_expire_time - self.expire_time
+    async def set_expire_time(self, new_expire_time: int):
+        expire_time = self.expire_time or 0
+        expire_delta = new_expire_time - expire_time
 
         # logic 1: 变更所有已缓存项目的expire
         # if expire_delta < 0:
@@ -135,18 +118,19 @@ class ExpireCache[T]:
         # Logic 1 end
 
         # logic 2: 变更所有已缓存项目的expire
-        now = time.time()
-        for key in self.cache.iterkeys():
-            data = self.cache.get(key, expire_time=True)
-            if data is None:
+        async for key in self.cache.scan("*"):
+            expire = await self.cache.get_expire(key)
+            if expire == UNLIMITED:
+                continue
+            if expire == NOT_EXIST:
+                await self.cache.delete(key)
                 continue
 
-            expire: int = data[1]  # type: ignore
-            new_expire = now - (expire + expire_delta)
+            new_expire = expire + expire_delta
             if new_expire <= 0:
-                self.cache.delete(key)
+                await self.cache.delete(key)
             else:
-                self.cache.touch(key, expire=new_expire)
+                await self.cache.expire(key, timeout=new_expire)
         # Logic 2 end
 
         self.expire_time = new_expire_time
@@ -159,13 +143,9 @@ class ExpireCache[T]:
     def deserialize_data(data) -> T:
         return data
 
-    def values(self) -> list[T]:
+    async def values(self) -> list[T]:
         """
         返回所有缓存的反序列化值列表
         """
-        result = []
-        for key in self.cache.iterkeys():
-            data = self.cache.get(key, default=None)
-            if data is not None:
-                result.append(self.deserialize_data(data))
+        result = [self.deserialize_data(data) async for _, data in self.cache.get_match("*") if data is not None]
         return result
