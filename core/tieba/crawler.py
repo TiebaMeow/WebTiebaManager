@@ -27,9 +27,8 @@ class CrawlNeed(BaseModel):
 
 
 class Crawler:
-    CACHE_FILE = BASE_DIR / "pid_cache.json"
-    cache: ExpireCache[int | str] = ExpireCache(expire=PID_CACHE_EXPIRE, path=CACHE_FILE)
-    cache.load_data()
+    CACHE_DIR = BASE_DIR / "crawler_cache"
+    cache: ExpireCache[int | str] = ExpireCache(directory=CACHE_DIR, expire_time=PID_CACHE_EXPIRE)
 
     client: aiotieba.Client
     browser: TiebaBrowser
@@ -155,15 +154,6 @@ class Crawler:
                         yield comment
 
                     self.cache.set(comment.pid, 1)
-
-        self.cache.save_data()
-
-    def save_cache(self):
-        self.cache.save_data()
-
-    @classmethod
-    def delete_cache(cls):
-        cls.CACHE_FILE.unlink(missing_ok=True)
 
 
 class CrawlerManager:

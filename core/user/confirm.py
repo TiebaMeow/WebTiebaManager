@@ -24,25 +24,7 @@ class ConfirmData(ConfirmSimpleData):
 
 
 class ConfirmCache(ExpireCache[ConfirmData]):
-    def __init__(self, user_dir: Path, expire: int = CONFIRM_EXPIRE, clear_after_set: bool = True):
-        path = user_dir / "confirm_cache.json"
-        super().__init__(expire, clear_after_set, path)
-        self.load_data()
+    """确认缓存，泛型为 ConfirmData"""
 
-    def set(self, key: str | int | float, data: ConfirmData):
-        result = super().set(key, data)
-        self.save_data()
-        return result
-
-    def delete(self, key: str | int | float) -> bool:
-        result = super().delete(key)
-        self.save_data()
-        return result
-
-    @staticmethod
-    def serialize_data(data):
-        return data.model_dump()
-
-    @staticmethod
-    def unserialize_data(data: dict):
-        return ConfirmData.model_validate(data)
+    def __init__(self, user_dir: Path, expire_time: int = CONFIRM_EXPIRE):
+        super().__init__(directory=user_dir / "confirm", expire_time=expire_time)

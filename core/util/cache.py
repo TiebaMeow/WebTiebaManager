@@ -1,82 +1,41 @@
 import asyncio
-import json
-import os
 import time
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
 
+import diskcache
+
 
 class ExpireCache[T]:
     """
-    注意：虽然key可以为多种类型，但实际储存时仍为str（json限制）
-    这可能导致意外的key重复，如 '123'(str) 与 123(int)，请只使用同一类型的key
+    dickcache 封装，兼容原有接口
     """
 
-    POSSIBLE_KEY = str | int | float
+    def __init__(self, directory: str | Path, expire_time: int = 86400):
+        self.expire_time = expire_time
+        self.cache = diskcache.Cache(directory=directory)
 
-    def __init__(
-        self,
-        expire: int = 86400,
-        clear_after_set: bool = True,
-        path: os.PathLike | None = None,
-    ):
-        self.expire: int = expire
-        self.data: dict[str | int, T] = {}
-        self.key: dict[str, float] = {}
-        self.path = path
+    def set(self, key, data: T):
+        self.cache.set(key, self.serialize_data(data), expire=self.expire_time)
 
-        if clear_after_set:
+    def get(self, key) -> T | None:
+        data = self.cache.get(key, default=None)
+        if data is not None:
+            return self.deserialize_data(data)
 
-            def set_(key: ExpireCache.POSSIBLE_KEY, data: T):
-                # 自动调用当前实例的 set 方法（支持子类重写）
-                type(self).set(self, key, data)
-                self.clean()
-
-            self.set = set_
-
-    @staticmethod
-    def format_key(key: POSSIBLE_KEY) -> str:
-        return str(key)
-
-    def set(self, key: POSSIBLE_KEY, data: T):
-        key = self.format_key(key)
-        self.data[key] = data
-        self.key[key] = time.monotonic()
-
-    def get(self, key: POSSIBLE_KEY) -> T | None:
-        key = self.format_key(key)
-        if key in self.data:
-            if time.monotonic() - self.key[key] > self.expire:
-                self.data.pop(key)
-                self.key.pop(key)
-            else:
-                return self.data[key]
-
-    def delete(self, key: POSSIBLE_KEY) -> bool:
-        key = self.format_key(key)
-        if key in self.data:
-            self.data.pop(key)
-            self.key.pop(key)
+    def delete(self, key) -> bool:
+        try:
+            self.cache.delete(key)
             return True
+        except KeyError:
+            return False
 
-        return False
-
-    def clean(self) -> int:
-        cleaned = 0
-        now = time.monotonic()
-
-        for key, create_time in self.key.copy().items():
-            if now - create_time > self.expire:
-                self.data.pop(key)
-                self.key.pop(key)
-                cleaned += 1
-
-        return cleaned
+    def expire(self) -> int:
+        return self.cache.expire()
 
     def clear(self) -> None:
-        self.data.clear()
-        self.key.clear()
+        self.cache.clear()
 
     def wrap(self, func: Callable[..., T]) -> Callable[..., T]:
         if asyncio.iscoroutinefunction(func):
@@ -104,28 +63,46 @@ class ExpireCache[T]:
 
             return wrapper
 
+    def set_expire_time(self, new_expire_time: int):
+        expire_delta = new_expire_time - self.expire_time
+
+        # logic 1: 变更所有已缓存项目的expire
+        # if expire_delta < 0:
+        #     self.cache.expire(now=time.time() + expire_delta)
+        # Logic 1 end
+
+        # logic 2: 变更所有已缓存项目的expire
+        now = time.time()
+        for key in self.cache.iterkeys():
+            data = self.cache.get(key, expire_time=True)
+            if data is None:
+                continue
+
+            expire: int = data[1]  # type: ignore
+            new_expire = now - (expire + expire_delta)
+            if new_expire <= 0:
+                self.cache.delete(key)
+            else:
+                self.cache.touch(key, expire=new_expire)
+        # Logic 2 end
+
+        self.expire_time = new_expire_time
+
     @staticmethod
     def serialize_data(data: T):
         return data
 
     @staticmethod
-    def unserialize_data(data):
+    def deserialize_data(data) -> T:
         return data
 
-    def save_data(self) -> None:
-        if self.path:
-            data = {
-                "data": {k: self.serialize_data(v) for k, v in self.data.items()},
-                "key": self.key,
-            }
-            with Path(self.path).open("w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-
-    def load_data(self) -> None:
-        if self.path and Path(self.path).exists():
-            with Path(self.path).open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                if not data:
-                    return
-                self.key = data["key"]
-                self.data = {k: self.unserialize_data(v) for k, v in data["data"].items()}
+    def values(self) -> list[T]:
+        """
+        返回所有缓存的反序列化值列表
+        """
+        result = []
+        for key in self.cache.iterkeys():
+            data = self.cache.get(key, default=None)
+            if data is not None:
+                result.append(self.deserialize_data(data))
+        return result

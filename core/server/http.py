@@ -131,7 +131,7 @@ async def set_rule_sets(user: current_user_depends, rule_sets: list[RuleSetConfi
 @app.get("/api/confirm/get_list", tags=["confirm"])
 async def get_confirm_list(user: current_user_depends) -> BaseResponse[list[ConfirmSimpleData]]:
     return BaseResponse(
-        data=[i.simple for i in sorted(user.confirm.data.values(), key=lambda x: x.process_time, reverse=True)]
+        data=[i.simple for i in sorted(user.confirm.values(), key=lambda x: x.process_time, reverse=True)]
     )
 
 

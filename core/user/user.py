@@ -111,7 +111,7 @@ class User:
         if not self.dir.exists():
             self.dir.mkdir(parents=True)
 
-        self.confirm = ConfirmCache(self.dir, expire=self.config.process.confirm_expire)
+        self.confirm = ConfirmCache(self.dir, expire_time=self.config.process.confirm_expire)
 
     @property
     def enable(self):
@@ -154,8 +154,7 @@ class User:
             self.client = TiebaClientEmpty()
 
         if old_config.process.confirm_expire != new_config.process.confirm_expire:
-            self.confirm.save_data()
-            self.confirm = ConfirmCache(self.dir, expire=new_config.process.confirm_expire)
+            self.confirm.set_expire_time(new_config.process.confirm_expire)
 
         self.save_config()
 
