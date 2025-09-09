@@ -156,39 +156,54 @@ async def test_mysql_and_pg_integration(tmp_path_factory):
 
     from core.db.config import DatabaseConfig
 
-    # MySQL
-    mysql_cfg = DatabaseConfig(
-        type="mysql",
-        username=os.environ["MYSQL_USER"],
-        password=os.environ["MYSQL_PASSWORD"],
-        host=os.environ["MYSQL_HOST"],
-        port=int(os.environ["MYSQL_PORT"]),
-        db=os.environ["MYSQL_DB"],
-    )
-    dbi.Controller.config = types.SimpleNamespace(database=mysql_cfg)  # type: ignore
-    await Database.startup()
-    await Database.save_items([make_content(3001)], on_conflict="upsert")
-    got = await Database.get_contents_by_pids([3001])
-    assert got
-    assert got[0].pid == 3001
-    await Database.teardown()
+    # 保护现场：保存当前（由模块级 fixture 建立的）配置与引擎/会话工厂，
+    # 以免下面的集成测试污染后续用例的运行环境。
+    orig_config = getattr(dbi.Controller, "config", None)  # type: ignore
+    orig_engine = getattr(Database, "engine", None)
+    orig_sessionmaker = getattr(Database, "sessionmaker", None)
 
-    # PostgreSQL
-    pg_cfg = DatabaseConfig(
-        type="postgresql",
-        username=os.environ["PG_USER"],
-        password=os.environ["PG_PASSWORD"],
-        host=os.environ["PG_HOST"],
-        port=int(os.environ["PG_PORT"]),
-        db=os.environ["PG_DB"],
-    )
-    dbi.Controller.config = types.SimpleNamespace(database=pg_cfg)  # type: ignore
-    await Database.startup()
-    await Database.save_items([make_content(4001)], on_conflict="upsert")
-    got = await Database.get_contents_by_pids([4001])
-    assert got
-    assert got[0].pid == 4001
-    await Database.teardown()
+    try:
+        # MySQL
+        mysql_cfg = DatabaseConfig(
+            type="mysql",
+            username=os.environ["MYSQL_USER"],
+            password=os.environ["MYSQL_PASSWORD"],
+            host=os.environ["MYSQL_HOST"],
+            port=int(os.environ["MYSQL_PORT"]),
+            db=os.environ["MYSQL_DB"],
+        )
+        dbi.Controller.config = types.SimpleNamespace(database=mysql_cfg)  # type: ignore
+        await Database.startup()
+        await Database.save_items([make_content(3001)], on_conflict="upsert")
+        got = await Database.get_contents_by_pids([3001])
+        assert got
+        assert got[0].pid == 3001
+        await Database.teardown()
+
+        # PostgreSQL
+        pg_cfg = DatabaseConfig(
+            type="postgresql",
+            username=os.environ["PG_USER"],
+            password=os.environ["PG_PASSWORD"],
+            host=os.environ["PG_HOST"],
+            port=int(os.environ["PG_PORT"]),
+            db=os.environ["PG_DB"],
+        )
+        dbi.Controller.config = types.SimpleNamespace(database=pg_cfg)  # type: ignore
+        await Database.startup()
+        await Database.save_items([make_content(4001)], on_conflict="upsert")
+        got = await Database.get_contents_by_pids([4001])
+        assert got
+        assert got[0].pid == 4001
+        await Database.teardown()
+    finally:
+        # 恢复现场：还原到模块级 sqlite 环境，保证后续测试继续使用原连接与数据。
+        if orig_config is not None:
+            dbi.Controller.config = orig_config  # type: ignore
+        if orig_engine is not None:
+            Database.engine = orig_engine
+        if orig_sessionmaker is not None:
+            Database.sessionmaker = orig_sessionmaker
 
 
 @pytest.mark.asyncio
