@@ -85,7 +85,7 @@ class Spider:
 
         for thread in raw_threads:
             thread_mark = f"{thread.last_time}.{thread.reply_num}"
-            cache_thread_mark = self.cache.get(thread.pid)
+            cache_thread_mark = await self.cache.get(thread.pid)
             updated = (cache_thread_mark is None and thread.reply_num > 0) or (thread_mark != cache_thread_mark)
             if cache_thread_mark is None and thread.reply_num > 0:
                 yield Thread.from_aiotieba_data(thread)
@@ -93,7 +93,7 @@ class Spider:
                 updated = True
 
             if not updated or (not need.post and not need.comment):
-                self.cache.set(thread.pid, thread_mark)
+                await self.cache.set(thread.pid, thread_mark)
                 continue
 
             raw_posts: list[Post] = []
@@ -120,7 +120,7 @@ class Spider:
                         raw_comments.extend(data.comments)
                         reply_num_dict.update(data.reply_num)
 
-            self.cache.set(thread.pid, thread_mark)
+            await self.cache.set(thread.pid, thread_mark)
 
             for post in raw_posts:
                 if post.floor == 1:
@@ -134,7 +134,7 @@ class Spider:
                     updated = True
 
                 if not updated or not need.post:
-                    self.cache.set(post.pid, reply_num)
+                    await self.cache.set(post.pid, reply_num)
                     continue
 
                 target_pn = (reply_num + 29) // 30
@@ -142,12 +142,12 @@ class Spider:
                     comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
                     raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
 
-                self.cache.set(post.pid, reply_num)
+                await self.cache.set(post.pid, reply_num)
 
                 for comment in raw_comments:
-                    if self.cache.get(comment.pid) is None:
+                    if await self.cache.get(comment.pid) is None:
                         yield comment
-                    self.cache.set(comment.pid, 1)
+                    await self.cache.set(comment.pid, 1)
 
 
 class Crawler:

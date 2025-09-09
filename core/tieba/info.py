@@ -1,16 +1,21 @@
-from typing import TypedDict
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
 
 import aiotieba
-from cachetools import TTLCache
 
 from core.control import Controller
 from core.db.interface import Database
 from core.process.typedef import ProcessObject
+from core.util.cache import ExpireCache
+
+if TYPE_CHECKING:
+    from aiotieba.typing import UserInfo
 
 
 class TiebaInfo:
     client: aiotieba.Client | None = None
-    user_info_cache = TTLCache(maxsize=3250, ttl=86400)
+    user_info_cache: ExpireCache[UserInfo] = ExpireCache(expire_time=86400, mem_max_size=3250)
 
     @classmethod
     async def stop(cls, _: None = None) -> None:
@@ -27,7 +32,7 @@ class TiebaInfo:
         return cls.client
 
     class UserInfoDict(TypedDict):
-        user_info: aiotieba.typing.UserInfo | None
+        user_info: UserInfo | None
 
     @classmethod
     async def get_user_info(cls, data: str | int | ProcessObject[UserInfoDict]):
@@ -39,12 +44,12 @@ class TiebaInfo:
         else:
             _id = data
 
-        if user_info := cls.user_info_cache.get(_id):
+        if user_info := await cls.user_info_cache.get(_id):
             return user_info
 
         user_info = await (await cls.get_client()).get_user_info(_id)
         if user_info.user_id:
-            cls.user_info_cache[_id] = user_info
+            await cls.user_info_cache.set(_id, user_info)
 
         if isinstance(data, ProcessObject):
             data.data["user_info"] = user_info
