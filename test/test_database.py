@@ -8,7 +8,7 @@ import pytest
 import pytest_asyncio
 
 from src.db.config import DatabaseConfig
-from src.db.models import ContentModel
+from src.db.models import ContentModel, Image
 
 # 注入一个最小化的 src.control 以避免导入时的循环依赖
 module = types.ModuleType("src.control")
@@ -225,6 +225,61 @@ async def test_upsert_updates_selected_columns(setup_db):
     assert got.floor == orig.floor + 1
     # create_time 不应被更新
     assert got.create_time == orig.create_time
+
+
+@pytest.mark.asyncio
+async def test_images_serialize_deserialize_non_empty(setup_db):
+    # 插入包含 images 的内容，验证能自动序列化到 JSON 并在读取时反序列化为 Image 模型
+    pid = 201
+    item = make_content(pid)
+    item.images = [
+        Image(hash="h1", width=10, height=20, src="http://x/1.jpg"),
+        Image(hash="h2", width=30, height=40, src="http://x/2.jpg"),
+    ]
+    await Database.delete_contents_by_pids([pid])
+    await Database.save_items([item], on_conflict="ignore")
+
+    got = (await Database.get_contents_by_pids([pid]))[0]
+    assert isinstance(got.images, list)
+    assert len(got.images) == 2
+    assert isinstance(got.images[0], Image)
+    assert got.images[0].hash == "h1"
+    assert isinstance(got.images[1], Image)
+    assert got.images[1].src.endswith("2.jpg")
+
+
+@pytest.mark.asyncio
+async def test_upsert_updates_images_field(setup_db):
+    # 先写入一条包含 1 张图片的记录
+    pid = 202
+    base = make_content(pid)
+    base.images = [Image(hash="h1", width=1, height=1, src="s1")]
+    await Database.delete_contents_by_pids([pid])
+    await Database.save_items([base], on_conflict="ignore")
+
+    # upsert 更新为 2 张图片
+    updated = make_content(pid)
+    updated.images = [
+        Image(hash="h2", width=2, height=2, src="s2"),
+        Image(hash="h3", width=3, height=3, src="s3"),
+    ]
+    await Database.save_items([updated], on_conflict="upsert")
+
+    got = (await Database.get_contents_by_pids([pid]))[0]
+    assert [img.hash for img in got.images] == ["h2", "h3"]
+
+    # 再次 upsert 但排除 images，不应改变现有 images
+    updated2 = make_content(pid)
+    updated2.images = [Image(hash="h4", width=4, height=4, src="s4")]
+    await Database.save_items([updated2], on_conflict="upsert", exclude_columns=["images"])
+    got2 = (await Database.get_contents_by_pids([pid]))[0]
+    assert [img.hash for img in got2.images] == ["h2", "h3"]
+
+
+@pytest.mark.asyncio
+async def test_delete_noop_on_empty_list(setup_db):
+    # 空集合删除应直接返回且不抛错
+    await Database.delete_contents_by_pids([])
 
 
 @pytest.mark.asyncio
