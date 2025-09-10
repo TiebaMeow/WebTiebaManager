@@ -32,6 +32,7 @@ ignore = ["PIE804", "G004", "F401", "N803"]
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"test_*.py" = ["E402", "E501"]
 
 [format]
 quote-style = "double"
