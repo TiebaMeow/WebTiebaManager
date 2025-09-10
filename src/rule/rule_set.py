@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from core.rule.rule import RuleGroup, Rules
+from src.rule.rule import RuleGroup, Rules
 
 from ..process.typedef import ProcessObject
 from .operation import STR_OPERATION, OperationGroup, Operations

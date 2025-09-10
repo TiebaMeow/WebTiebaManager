@@ -8,8 +8,8 @@ import aiofiles
 import aiohttp
 from pydantic import BaseModel
 
-from core.typedef import Comment, Image, Post, User
-from core.util.tools import timestring
+from src.typedef import Comment, Image, Post, User
+from src.util.tools import timestring
 
 
 class ResponseUser(TypedDict):

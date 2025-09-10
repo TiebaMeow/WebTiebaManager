@@ -4,7 +4,7 @@ import tomlkit
 import yaml
 from pydantic import BaseModel
 
-from core.db.config import DatabaseConfig
+from src.db.config import DatabaseConfig
 
 from .constance import BASE_DIR
 from .server.config import ServerConfig, random_secret

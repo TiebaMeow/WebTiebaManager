@@ -2,22 +2,22 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
-from core.config import write_config
-from core.constance import USER_DIR
-from core.control import Controller
-from core.process.process import Processer
-from core.process.typedef import ProcessObject
-from core.rule.operation import OperationGroup
-from core.rule.rule_set import RuleSet
-from core.tieba.info import TiebaInfo
-from core.typedef import Content
-from core.util.tools import int_time
+from src.config import write_config
+from src.constance import USER_DIR
+from src.control import Controller
+from src.process.process import Processer
+from src.process.typedef import ProcessObject
+from src.rule.operation import OperationGroup
+from src.rule.rule_set import RuleSet
+from src.tieba.info import TiebaInfo
+from src.typedef import Content
+from src.util.tools import int_time
 
 from .config import UserConfig
 from .confirm import ConfirmCache, ConfirmData
 
 if TYPE_CHECKING:
-    from core.util.event import EventListener
+    from src.util.event import EventListener
 
 
 class TiebaClientEmpty:

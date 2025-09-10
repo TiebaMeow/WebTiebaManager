@@ -1,10 +1,10 @@
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from core.config import ServerConfig, SystemConfig
-from core.control import Controller
-from core.user.config import UserConfig, UserInfo
-from core.user.manager import UserManager
+from src.config import ServerConfig, SystemConfig
+from src.control import Controller
+from src.user.config import UserConfig, UserInfo
+from src.user.manager import UserManager
 
 from .server import BaseResponse, Server, app
 

@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 
-from core.constance import BDUSS_MOSAIC, CONFIRM_EXPIRE, CONTENT_VALID_EXPIRE, STOKEN_MOSAIC
-from core.rule.rule_set import RuleSetConfig
-from core.util.tools import int_time
+from src.constance import BDUSS_MOSAIC, CONFIRM_EXPIRE, CONTENT_VALID_EXPIRE, STOKEN_MOSAIC
+from src.rule.rule_set import RuleSetConfig
+from src.util.tools import int_time
 
 
 class UserInfo(BaseModel):

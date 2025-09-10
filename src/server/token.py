@@ -8,8 +8,8 @@ from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-from core.control import Controller
-from core.user.manager import User, UserManager
+from src.control import Controller
+from src.user.manager import User, UserManager
 
 from .encryt import encrypt
 from .server import app

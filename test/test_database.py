@@ -7,11 +7,11 @@ from zoneinfo import ZoneInfo
 import pytest
 import pytest_asyncio
 
-from core.db.config import DatabaseConfig
-from core.db.models import ContentModel
+from src.db.config import DatabaseConfig
+from src.db.models import ContentModel
 
-# 注入一个最小化的 core.control 以避免导入时的循环依赖
-module = types.ModuleType("core.control")
+# 注入一个最小化的 src.control 以避免导入时的循环依赖
+module = types.ModuleType("src.control")
 
 
 class _DummyEvent:
@@ -37,9 +37,9 @@ class _DummyController:
 
 # 为模块设置属性
 module.Controller = _DummyController  # type: ignore
-sys.modules["core.control"] = module
+sys.modules["src.control"] = module
 
-import core.db.interface as dbi  # noqa: E402
+import src.db.interface as dbi  # noqa: E402
 
 Database = dbi.Database
 
@@ -140,7 +140,7 @@ async def test_upsert_with_exclude_all_nonpk_no_update(setup_db):
 
 
 def test_mixed_model_raise_type_error():
-    from core.db.models import ForumModel
+    from src.db.models import ForumModel
 
     f = ForumModel(fname="f", fid=1)
     c = make_content(999)
@@ -154,7 +154,7 @@ def test_mixed_model_raise_type_error():
 async def test_mysql_and_pg_integration(tmp_path_factory):
     import os
 
-    from core.db.config import DatabaseConfig
+    from src.db.config import DatabaseConfig
 
     # 保护现场：保存当前（由模块级 fixture 建立的）配置与引擎/会话工厂，
     # 以免下面的集成测试污染后续用例的运行环境。

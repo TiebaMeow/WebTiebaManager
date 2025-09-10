@@ -1,7 +1,7 @@
 from typing import Literal, TypedDict
 
-from core.process.typedef import ProcessObject
-from core.tieba.info import TiebaInfo
+from src.process.typedef import ProcessObject
+from src.tieba.info import TiebaInfo
 
 from .rule import Rules
 from .template import LimiterRule, TextRule

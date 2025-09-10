@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from core.util.tools import int_time, random_secret
+from src.util.tools import int_time, random_secret
 
 
 class ServerConfig(BaseModel, extra="ignore"):

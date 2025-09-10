@@ -6,13 +6,13 @@ import aiotieba
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
-from core.constance import BASE_DIR, PID_CACHE_EXPIRE
-from core.control import Controller
-from core.db.interface import ContentModel, Database
-from core.typedef import Comment, Post, Thread
-from core.user.manager import UserManager
-from core.util.cache import ClearCache, ExpireCache
-from core.util.tools import EtaSleep
+from src.constance import BASE_DIR, PID_CACHE_EXPIRE
+from src.control import Controller
+from src.db.interface import ContentModel, Database
+from src.typedef import Comment, Post, Thread
+from src.user.manager import UserManager
+from src.util.cache import ClearCache, ExpireCache
+from src.util.tools import EtaSleep
 
 from .browser import TiebaBrowser
 

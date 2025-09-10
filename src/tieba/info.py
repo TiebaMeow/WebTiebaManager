@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, TypedDict
 
 import aiotieba
 
-from core.control import Controller
-from core.db.interface import Database
-from core.process.typedef import ProcessObject
-from core.util.cache import ExpireCache
+from src.control import Controller
+from src.db.interface import Database
+from src.process.typedef import ProcessObject
+from src.util.cache import ExpireCache
 
 if TYPE_CHECKING:
     from aiotieba.typing import UserInfo

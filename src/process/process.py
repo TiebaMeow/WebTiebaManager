@@ -1,5 +1,5 @@
-from core.rule.rule_set import RuleSet
-from core.user.config import UserConfig
+from src.rule.rule_set import RuleSet
+from src.user.config import UserConfig
 
 from .typedef import ProcessObject
 

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from core.process.typedef import ProcessObject
+from src.process.typedef import ProcessObject
 
 from .rule import RuleTemplate
 

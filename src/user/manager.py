@@ -1,9 +1,9 @@
 import shutil
 
-from core.config import read_config, write_config
-from core.constance import USER_DIR
-from core.control import Controller
-from core.util.event import AsyncEvent
+from src.config import read_config, write_config
+from src.constance import USER_DIR
+from src.control import Controller
+from src.util.event import AsyncEvent
 
 from .user import User, UserConfig
 

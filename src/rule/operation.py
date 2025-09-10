@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, TypeAdapter
 
 if TYPE_CHECKING:
-    from core.process.typedef import ProcessObject
+    from src.process.typedef import ProcessObject
 
-from core.tieba.info import TiebaInfo
+from src.tieba.info import TiebaInfo
 
 
 class OperationTemplate(BaseModel):

@@ -5,7 +5,7 @@ from apscheduler.triggers.cron import CronTrigger
 from cashews import Cache
 from cashews.backends.interface import NOT_EXIST, UNLIMITED
 
-from core.control import Controller
+from src.control import Controller
 
 from .event import AsyncEvent
 

@@ -1,8 +1,8 @@
 """
 使用方法：
 
-from core.typedef import Content
-from core.db import Database, ContentModel
+from src.typedef import Content
+from src.db import Database, ContentModel
 
 contents: list[Content]
 content_models = [ContentModel.from_content(c) for c in contents]
@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from core.control import Controller
+from src.control import Controller
 
 from .config import DatabaseConfig
 from .models import Base, ContentModel, ForumModel, LifeModel, UserModel

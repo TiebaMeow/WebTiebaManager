@@ -6,10 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from core.config import CONFIG_PATH
-from core.control import Controller
-from core.tieba import crawler
-from core.user.manager import UserManager
+from src.config import CONFIG_PATH
+from src.control import Controller
+from src.tieba import crawler
+from src.user.manager import UserManager
 
 HTTP_ALLOW_ORIGINS = ["*"]
 
@@ -88,9 +88,7 @@ class Server:
 
     @classmethod
     def dev_run(cls):
-        uvicorn.run(
-            "core.server.server:app", host="0.0.0.0", port=36799, log_level="info", access_log=True, reload=True
-        )
+        uvicorn.run("src.server.server:app", host="0.0.0.0", port=36799, log_level="info", access_log=True, reload=True)
 
     @classmethod
     def run(cls):
