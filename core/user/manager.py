@@ -16,6 +16,7 @@ class UserManager:
 
     @classmethod
     async def silent_load_users(cls):
+        # server在判断是否需要初始化时会调用此函数，先于UserManager.load_users
         await cls.clear_users()
 
         for user_dir in USER_DIR.iterdir():
