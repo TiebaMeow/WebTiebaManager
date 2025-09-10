@@ -1,131 +1,163 @@
-import asyncio
-import json
-import os
-import time
-from collections.abc import Callable
-from functools import wraps
 from pathlib import Path
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from cashews import Cache
+from cashews.backends.interface import NOT_EXIST, UNLIMITED
+
+from core.control import Controller
+
+from .event import AsyncEvent
+
+ClearCache = AsyncEvent[None]()
+Key = str
+PossibleKey = str | int | float
+
+
+class CacheCleaner:
+    _clear_cache_scheduler: AsyncIOScheduler | None = None
+    _clear_cache_time: str = "04:00"
+
+    @classmethod
+    def initialize(cls):
+        if cls._clear_cache_scheduler is None:
+            cls._clear_cache_scheduler = AsyncIOScheduler()
+
+    @classmethod
+    async def clear_cache(cls):
+        await ClearCache.broadcast(None)
+
+    @classmethod
+    def setup_job(cls):
+        hour, minute = map(int, cls._clear_cache_time.split(":"))
+        cls._clear_cache_scheduler.add_job(  # type: ignore
+            cls.clear_cache,
+            trigger=CronTrigger(hour=hour, minute=minute),
+            id="clear_cache_job",
+            replace_existing=True,
+            executor="default",
+            misfire_grace_time=300,
+        )
+
+    @classmethod
+    def start(cls, _=None):
+        cls.initialize()
+        cls.setup_job()
+        cls._clear_cache_scheduler.start()  # type: ignore
+
+    @classmethod
+    def stop(cls, _=None):
+        if cls._clear_cache_scheduler and cls._clear_cache_scheduler.running:
+            cls._clear_cache_scheduler.shutdown()
+
+    @classmethod
+    def update_clear_cache_time(cls, _=None):
+        if Controller.config.cleanup_time != cls._clear_cache_time:
+            cls._clear_cache_time = Controller.config.cleanup_time
+            cls.setup_job()
+
+
+Controller.Start.on(CacheCleaner.start)
+Controller.Stop.on(CacheCleaner.stop)
+Controller.SystemConfigChange.on(CacheCleaner.update_clear_cache_time)
 
 
 class ExpireCache[T]:
     """
-    注意：虽然key可以为多种类型，但实际储存时仍为str（json限制）
-    这可能导致意外的key重复，如 '123'(str) 与 123(int)，请只使用同一类型的key
-    """
+    cashews 封装，兼容原有接口
 
-    POSSIBLE_KEY = str | int | float
+    Attributes:
+        directory (Path | None): 磁盘缓存路径，为 None 则使用内存缓存
+        expire_time (int | None): 缓存过期时间，为 None 则不设置过期时间
+        mem_max_size (int): 内存缓存最大数量，仅在 directory 为 None 时生效
+    """
 
     def __init__(
         self,
-        expire: int = 86400,
-        clear_after_set: bool = True,
-        path: os.PathLike | None = None,
+        directory: Path | None = None,
+        *,
+        expire_time: int | None = 86400,
+        mem_max_size: int = 10000,
     ):
-        self.expire: int = expire
-        self.data: dict[str | int, T] = {}
-        self.key: dict[str, float] = {}
-        self.path = path
+        self.cache = Cache()
+        self.expire_time = expire_time
 
-        if clear_after_set:
+        if directory is None:
+            self.cache.setup(f"mem://?size={mem_max_size}")
+        else:
+            directory_str = directory.resolve().as_posix()
+            self.cache.setup(f"disk://?shards=0&directory={directory_str}")
+        self.listener = ClearCache.on(self.expire)
 
-            def set_(key: ExpireCache.POSSIBLE_KEY, data: T):
-                # 自动调用当前实例的 set 方法（支持子类重写）
-                type(self).set(self, key, data)
-                self.clean()
+    async def stop(self):
+        self.listener.un_register()
+        await self.cache.close()
 
-            self.set = set_
-
-    @staticmethod
-    def format_key(key: POSSIBLE_KEY) -> str:
+    def fmt_key(self, key: PossibleKey) -> Key:
         return str(key)
 
-    def set(self, key: POSSIBLE_KEY, data: T):
-        key = self.format_key(key)
-        self.data[key] = data
-        self.key[key] = time.monotonic()
+    async def set(self, key: PossibleKey, data: T):
+        await self.cache.set(self.fmt_key(key), self.serialize_data(data), expire=self.expire_time)
 
-    def get(self, key: POSSIBLE_KEY) -> T | None:
-        key = self.format_key(key)
-        if key in self.data:
-            if time.monotonic() - self.key[key] > self.expire:
-                self.data.pop(key)
-                self.key.pop(key)
+    async def get(self, key: PossibleKey) -> T | None:
+        data = await self.cache.get(self.fmt_key(key), default=None)
+        if data is not None:
+            return self.deserialize_data(data)
+        return None
+
+    async def delete(self, key: PossibleKey) -> bool:
+        return await self.cache.delete(self.fmt_key(key))
+
+    async def expire(self, _=None) -> None:
+        expired_keys = set()
+        async for key in self.cache.scan("*"):
+            expire = await self.cache.get_expire(key)
+            if expire == NOT_EXIST:
+                expired_keys.add(key)
+        if expired_keys:
+            await self.cache.delete(*expired_keys)
+
+    async def clear(self) -> None:
+        await self.cache.clear()
+
+    async def set_expire_time(self, new_expire_time: int):
+        expire_time = self.expire_time or 0
+        expire_delta = new_expire_time - expire_time
+
+        # logic 1: 变更所有已缓存项目的expire
+        # if expire_delta < 0:
+        #     self.cache.expire(now=time.time() + expire_delta)
+        # Logic 1 end
+
+        # logic 2: 变更所有已缓存项目的expire
+        async for key in self.cache.scan("*"):
+            expire = await self.cache.get_expire(key)
+            if expire == UNLIMITED:
+                continue
+            if expire == NOT_EXIST:
+                await self.cache.delete(key)
+                continue
+
+            new_expire = expire + expire_delta
+            if new_expire <= 0:
+                await self.cache.delete(key)
             else:
-                return self.data[key]
+                await self.cache.expire(key, timeout=new_expire)
+        # Logic 2 end
 
-    def delete(self, key: POSSIBLE_KEY) -> bool:
-        key = self.format_key(key)
-        if key in self.data:
-            self.data.pop(key)
-            self.key.pop(key)
-            return True
-
-        return False
-
-    def clean(self) -> int:
-        cleaned = 0
-        now = time.monotonic()
-
-        for key, create_time in self.key.copy().items():
-            if now - create_time > self.expire:
-                self.data.pop(key)
-                self.key.pop(key)
-                cleaned += 1
-
-        return cleaned
-
-    def clear(self) -> None:
-        self.data.clear()
-        self.key.clear()
-
-    def wrap(self, func: Callable[..., T]) -> Callable[..., T]:
-        if asyncio.iscoroutinefunction(func):
-
-            @wraps(func)
-            async def async_wrapper(*args, **kwargs) -> T:
-                key = f"{func.__name__}_{args}_{kwargs}"
-                if (data := self.get(key)) is not None:
-                    return data
-                result = await func(*args, **kwargs)
-                self.set(key, result)
-                return result
-
-            return async_wrapper  # type: ignore
-        else:
-
-            @wraps(func)
-            def wrapper(*args, **kwargs) -> T:
-                key = f"{func.__name__}_{args}_{kwargs}"
-                if (data := self.get(key)) is not None:
-                    return data
-                result = func(*args, **kwargs)
-                self.set(key, result)
-                return result
-
-            return wrapper
+        self.expire_time = new_expire_time
 
     @staticmethod
     def serialize_data(data: T):
         return data
 
     @staticmethod
-    def unserialize_data(data):
+    def deserialize_data(data) -> T:
         return data
 
-    def save_data(self) -> None:
-        if self.path:
-            data = {
-                "data": {k: self.serialize_data(v) for k, v in self.data.items()},
-                "key": self.key,
-            }
-            with Path(self.path).open("w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-
-    def load_data(self) -> None:
-        if self.path and Path(self.path).exists():
-            with Path(self.path).open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                if not data:
-                    return
-                self.key = data["key"]
-                self.data = {k: self.unserialize_data(v) for k, v in data["data"].items()}
+    async def values(self) -> list[T]:
+        """
+        返回所有缓存的反序列化值列表
+        """
+        result = [self.deserialize_data(data) async for _, data in self.cache.get_match("*") if data is not None]
+        return result

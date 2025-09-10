@@ -8,16 +8,17 @@ import numpy as np
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from core.constance import BDUSS_MOSAIC
+from core.constance import BDUSS_MOSAIC, STOKEN_MOSAIC
 from core.control import Controller
 from core.rule.rule import RuleInfo, Rules
 from core.rule.rule_set import RuleSetConfig
 from core.user.config import ForumConfig, ProcessConfig
 from core.user.confirm import ConfirmSimpleData
 from core.user.manager import User, UserManager
+from core.util.cache import ClearCache
 
 from .server import BaseResponse, app
-from .token import current_user_depends
+from .token import current_user_depends, system_access_depends
 
 
 class AnonymousClient:
@@ -101,7 +102,7 @@ async def set_user_config(user: current_user_depends, req: UserConfigData) -> Ba
     config = user.config.model_copy(deep=True)
     if BDUSS_MOSAIC in req.forum.bduss:
         req.forum.bduss = user.config.forum.bduss
-    if BDUSS_MOSAIC in req.forum.stoken:
+    if STOKEN_MOSAIC in req.forum.stoken:
         req.forum.stoken = user.config.forum.stoken
     config.forum = req.forum
     config.process = req.process
@@ -131,7 +132,7 @@ async def set_rule_sets(user: current_user_depends, rule_sets: list[RuleSetConfi
 @app.get("/api/confirm/get_list", tags=["confirm"])
 async def get_confirm_list(user: current_user_depends) -> BaseResponse[list[ConfirmSimpleData]]:
     return BaseResponse(
-        data=[i.simple for i in sorted(user.confirm.data.values(), key=lambda x: x.process_time, reverse=True)]
+        data=[i.simple for i in sorted(await user.confirm.values(), key=lambda x: x.process_time, reverse=True)]
     )
 
 
@@ -141,7 +142,7 @@ class ConfirmRequest(BaseModel):
 
 
 async def confirm_many(user: User, pids: list[int], action: Literal["ignore", "execute"]):
-    confirms = [confirm for pid in pids if (confirm := user.confirm.get(pid))]
+    confirms = [confirm for pid in pids if (confirm := await user.confirm.get(pid))]
     for confirm in confirms:
         await user.operate_confirm(confirm, action)
 
@@ -152,7 +153,7 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
         return BaseResponse(data=False, message="账号未登录，不能执行确认操作", code=400)
 
     if isinstance(request.pid, int):
-        if not (confirm := user.confirm.get(request.pid)):
+        if not (confirm := await user.confirm.get(request.pid)):
             return BaseResponse(data=False, message="内容不存在", code=400)
 
         await user.operate_confirm(confirm, request.action)
@@ -160,6 +161,12 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
     else:
         asyncio.create_task(confirm_many(user, request.pid, request.action))
         return BaseResponse(data=True, message="正在批量执行操作，请稍后查看结果")
+
+
+@app.post("/api/cache/clear", tags=["cache"], description="手动清理缓存")
+async def clear_confirms(system_access: system_access_depends) -> BaseResponse[bool]:
+    await ClearCache.broadcast(None)
+    return BaseResponse(data=True, message="操作成功")
 
 
 def ndarray2image(image: np.ndarray | None) -> io.BytesIO:

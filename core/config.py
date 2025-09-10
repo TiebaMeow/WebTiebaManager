@@ -1,9 +1,10 @@
-import os
 from pathlib import Path
 
 import tomlkit
 import yaml
 from pydantic import BaseModel
+
+from core.db.config import DatabaseConfig
 
 from .constance import BASE_DIR
 from .server.config import ServerConfig, random_secret
@@ -13,6 +14,8 @@ from .tieba.config import ScanConfig
 class SystemConfig(BaseModel, extra="ignore"):
     scan: ScanConfig = ScanConfig()
     server: ServerConfig = ServerConfig(key=random_secret())
+    database: DatabaseConfig = DatabaseConfig(type="sqlite", path=str(BASE_DIR / "data.db"))
+    cleanup_time: str = "04:00"  # 缓存清理时间，格式如 "HH:MM"
 
 
 def read_config[T](path: Path, obj: type[T]) -> T:

@@ -8,8 +8,10 @@ dependencies = [
     "aiofiles>=24.1.0",
     "aiosqlite>=0.21.0",
     "aiotieba>=4.6.0",
+    "apscheduler>=3.11.0",
     "asyncmy>=0.2.10",
     "asyncpg>=0.30.0",
+    "cashews[diskcache]>=7.4.1",
     "fastapi>=0.116.1",
     "numpy>=2.3.2",
     "opencv-python-headless>=4.11.0.86",
@@ -22,6 +24,11 @@ dependencies = [
     "tomlkit>=0.13.3",
     "tzdata>=2025.2",
     "uvicorn>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.1.0",
 ]
 
 [[tool.uv.index]]

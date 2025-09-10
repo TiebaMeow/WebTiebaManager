@@ -9,6 +9,7 @@ from core.process.process import Processer
 from core.process.typedef import ProcessObject
 from core.rule.operation import OperationGroup
 from core.rule.rule_set import RuleSet
+from core.tieba.info import TiebaInfo
 from core.typedef import Content
 from core.util.tools import int_time
 
@@ -20,6 +21,9 @@ if TYPE_CHECKING:
 
 
 class TiebaClientEmpty:
+    class InvalidClientError(Exception):
+        pass
+
     bduss = ""
     stoken = ""
     client = None  # type: ignore
@@ -29,10 +33,16 @@ class TiebaClientEmpty:
         pass
 
     async def delete(self, content: Content):
-        raise Exception("invalid client")
+        raise self.InvalidClientError("invalid client")
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        raise Exception("invalid client")
+        raise self.InvalidClientError("invalid client")
+
+    async def delete_thread(self, fname: str, tid: int):
+        raise self.InvalidClientError("invalid client")
+
+    async def delete_post(self, fname: str, tid: int, pid: int):
+        raise self.InvalidClientError("invalid client")
 
 
 class TiebaClient:
@@ -68,11 +78,17 @@ class TiebaClient:
         if self.client:
             await self.client.__aexit__()
 
+    async def delete_thread(self, fname: str, tid: int):
+        return await self.client.del_thread(fname, tid=tid)
+
+    async def delete_post(self, fname: str, tid: int, pid: int):
+        return await self.client.del_post(fname, tid=tid, pid=pid)
+
     async def delete(self, content: Content):
         if content.type == "thread":
-            return await self.client.del_thread(content.fname, tid=content.tid)
+            return await self.delete_thread(content.fname, tid=content.tid)
         else:
-            return await self.client.del_post(content.fname, tid=content.tid, pid=content.pid)
+            return await self.delete_post(content.fname, tid=content.tid, pid=content.pid)
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
         return await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
@@ -86,16 +102,13 @@ class User:
         需调用update_config进行初始化
         """
         self.config = config
-        self.listeners: list[EventListener] = [
-            Controller.DispatchContent.on(self.process),
-            Controller.Stop.on(self.stop),
-        ]
+        self.listeners: list[EventListener] = [Controller.DispatchContent.on(self.process)]
         self.client: TiebaClient | TiebaClientEmpty = TiebaClientEmpty()
         self.dir = USER_DIR / self.config.user.username
         if not self.dir.exists():
             self.dir.mkdir(parents=True)
 
-        self.confirm = ConfirmCache(self.dir, expire=self.config.process.confirm_expire)
+        self.confirm = ConfirmCache(self.dir, expire_time=self.config.process.confirm_expire)
 
     @property
     def enable(self):
@@ -122,6 +135,8 @@ class User:
         if isinstance(self.client, TiebaClient):
             await self.client.stop()
 
+        await self.confirm.stop()
+
     async def update_config(self, new_config: UserConfig):
         old_config = self.config
         self.config = new_config
@@ -138,8 +153,7 @@ class User:
             self.client = TiebaClientEmpty()
 
         if old_config.process.confirm_expire != new_config.process.confirm_expire:
-            self.confirm.save_data()
-            self.confirm = ConfirmCache(self.dir, expire=new_config.process.confirm_expire)
+            await self.confirm.set_expire_time(new_config.process.confirm_expire)
 
         self.save_config()
 
@@ -179,8 +193,10 @@ class User:
             for operation in operations:
                 if operation.type == "delete":
                     if operation.options.delete_thread_if_author:
-                        # TODO db查询，完成功能适配
-                        pass
+                        if await TiebaInfo.get_if_thread_author(obj):
+                            await self.client.delete_thread(obj.content.fname, obj.content.tid)
+                            continue
+
                     await self.client.delete(obj.content)
                 elif operation.type == "block":
                     await self.client.block(
@@ -201,13 +217,20 @@ class User:
                 await self.operate(obj, og)
 
             og = rule_set.operations.no_direct_operations
-            # TODO 在这里储存所需的数据
+
             if og:
-                self.confirm.set(
+                data = {}
+
+                if not isinstance(og.operations, str):
+                    for operation in og.operations:
+                        # 储存operation需要的数据
+                        await operation.store_data(obj, data)
+
+                await self.confirm.set(
                     obj.content.pid,
                     ConfirmData(
                         content=obj.content,
-                        data={},
+                        data=data,
                         operations=og.serialize(),
                         process_time=int_time(),
                         rule_set_name=rule_set.name,
@@ -215,24 +238,29 @@ class User:
                 )
 
         else:
-            await self.operate(obj, rule_set.operations)
+            try:
+                await self.operate(obj, rule_set.operations)
+            except TiebaClientEmpty.InvalidClientError:
+                # TODO 登录失效提示
+                pass
 
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         # TODO confirm日志显示
         if isinstance(confirm, (str, int)):
-            if (_ := self.confirm.get(confirm)) is None:
+            if (_ := await self.confirm.get(confirm)) is None:
                 return False
 
             confirm = _
 
         if isinstance(confirm, ConfirmData):
             if action == "ignore":
-                self.confirm.delete(confirm.content.pid)
+                await self.confirm.delete(confirm.content.pid)
                 return True
             elif action == "execute":
                 obj = ProcessObject(confirm.content, confirm.data)
                 og = OperationGroup.deserialize(confirm.operations)  # type: ignore
                 await self.operate(obj, og)
+                await self.confirm.delete(confirm.content.pid)
                 return True
             else:
                 raise ValueError("Invalid action")
