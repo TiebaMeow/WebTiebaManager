@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
+from pydantic import BaseModel
 from sqlalchemy import BIGINT, JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, foreign, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
-from ..typedef import Image  # noqa: TC001
+from ..typedef import Image
 
 if TYPE_CHECKING:
     from ..typedef import Content, User
@@ -22,6 +24,30 @@ SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 
 def now_with_tz():
     return datetime.now(SHANGHAI_TZ)
+
+
+class ModelListType[T: BaseModel](TypeDecorator):
+    impl = JSON
+    cache_ok = True
+
+    def __init__(self, ModelType: type[T] = Image, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._ModelType = ModelType
+
+    def process_bind_param(self, value: list[T] | None, dialect) -> list[dict[str, Any]]:
+        if value is None:
+            return []
+        return [i.model_dump(mode="json") for i in value]
+
+    def process_result_value(self, value: list[dict[str, Any]] | None, dialect) -> list[T]:
+        if value is None:
+            return []
+        model_type = self._ModelType
+        return [model_type(**i) for i in value]
+
+    @property
+    def python_type(self):
+        return list
 
 
 class ForumModel(Base):
@@ -73,7 +99,7 @@ class ContentModel(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=True)
     floor: Mapped[int] = mapped_column(Integer, nullable=False)
-    images: Mapped[list[Image]] = mapped_column(JSON, nullable=False, default=list)
+    images: Mapped[list[Image]] = mapped_column(ModelListType(Image), nullable=False, default=list)
     type: Mapped[str] = mapped_column(String(255), nullable=False)
 
     author_id: Mapped[int] = mapped_column(BIGINT, index=True)
@@ -104,7 +130,7 @@ class ContentModel(Base):
             text=content.text,
             create_time=datetime.fromtimestamp(content.create_time, tz=SHANGHAI_TZ),
             floor=content.floor,
-            images=[i.model_dump() for i in content.images],
+            images=content.images,
             type=content.type,
             author_id=content.user.user_id,
         )

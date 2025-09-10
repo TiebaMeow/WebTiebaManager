@@ -1,0 +1,63 @@
+name: CI
+
+on:
+    push:
+        branches: 
+            - main
+            - 'dev/**'
+    pull_request:
+        branches: 
+            - main
+            - 'dev/**'
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: wtm
+          MYSQL_USER: wtm
+          MYSQL_PASSWORD: wtm
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pmysql"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: wtm
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      RUN_DB_INTEGRATION: "1"
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_USER: wtm
+      MYSQL_PASSWORD: wtm
+      MYSQL_DB: wtm
+      PG_HOST: 127.0.0.1
+      PG_PORT: "5432"
+      PG_USER: postgres
+      PG_PASSWORD: postgres
+      PG_DB: wtm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync deps
+        run: uv sync --all-groups
+
+      - name: Run tests
+        run: uv run pytest
