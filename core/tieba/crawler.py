@@ -128,7 +128,7 @@ class Spider:
                 if post.floor == 1:
                     continue
                 reply_num = reply_num_dict.get(post.pid, 0)
-                reply_num_cache = self.cache.get(post.pid)
+                reply_num_cache = await self.cache.get(post.pid)
                 updated = (reply_num_cache is None and reply_num > 4) or (reply_num != reply_num_cache)
                 if reply_num_cache is None and reply_num > 4 and need.post:
                     yield post

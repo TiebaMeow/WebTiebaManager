@@ -138,7 +138,7 @@ class User:
         if isinstance(self.client, TiebaClient):
             await self.client.stop()
 
-        self.confirm.stop()
+        await self.confirm.stop()
 
     async def update_config(self, new_config: UserConfig):
         old_config = self.config
@@ -156,7 +156,7 @@ class User:
             self.client = TiebaClientEmpty()
 
         if old_config.process.confirm_expire != new_config.process.confirm_expire:
-            self.confirm.set_expire_time(new_config.process.confirm_expire)
+            await self.confirm.set_expire_time(new_config.process.confirm_expire)
 
         self.save_config()
 
@@ -229,7 +229,7 @@ class User:
                         # 储存operation需要的数据
                         await operation.store_data(obj, data)
 
-                self.confirm.set(
+                await self.confirm.set(
                     obj.content.pid,
                     ConfirmData(
                         content=obj.content,
@@ -250,20 +250,20 @@ class User:
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         # TODO confirm日志显示
         if isinstance(confirm, (str, int)):
-            if (_ := self.confirm.get(confirm)) is None:
+            if (_ := await self.confirm.get(confirm)) is None:
                 return False
 
             confirm = _
 
         if isinstance(confirm, ConfirmData):
             if action == "ignore":
-                self.confirm.delete(confirm.content.pid)
+                await self.confirm.delete(confirm.content.pid)
                 return True
             elif action == "execute":
                 obj = ProcessObject(confirm.content, confirm.data)
                 og = OperationGroup.deserialize(confirm.operations)  # type: ignore
                 await self.operate(obj, og)
-                self.confirm.delete(confirm.content.pid)
+                await self.confirm.delete(confirm.content.pid)
                 return True
             else:
                 raise ValueError("Invalid action")

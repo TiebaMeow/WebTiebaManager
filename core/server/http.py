@@ -132,7 +132,7 @@ async def set_rule_sets(user: current_user_depends, rule_sets: list[RuleSetConfi
 @app.get("/api/confirm/get_list", tags=["confirm"])
 async def get_confirm_list(user: current_user_depends) -> BaseResponse[list[ConfirmSimpleData]]:
     return BaseResponse(
-        data=[i.simple for i in sorted(user.confirm.values(), key=lambda x: x.process_time, reverse=True)]
+        data=[i.simple for i in sorted(await user.confirm.values(), key=lambda x: x.process_time, reverse=True)]
     )
 
 
@@ -142,7 +142,7 @@ class ConfirmRequest(BaseModel):
 
 
 async def confirm_many(user: User, pids: list[int], action: Literal["ignore", "execute"]):
-    confirms = [confirm for pid in pids if (confirm := user.confirm.get(pid))]
+    confirms = [confirm for pid in pids if (confirm := await user.confirm.get(pid))]
     for confirm in confirms:
         await user.operate_confirm(confirm, action)
 
@@ -153,7 +153,7 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
         return BaseResponse(data=False, message="账号未登录，不能执行确认操作", code=400)
 
     if isinstance(request.pid, int):
-        if not (confirm := user.confirm.get(request.pid)):
+        if not (confirm := await user.confirm.get(request.pid)):
             return BaseResponse(data=False, message="内容不存在", code=400)
 
         await user.operate_confirm(confirm, request.action)
