@@ -223,7 +223,7 @@ async def test_upsert_updates_selected_columns(setup_db):
     got = (await Database.get_contents_by_pids([1]))[0]
     assert got.text == "updated-text"
     assert got.floor == orig.floor + 1
-    # create_time 未应被更新
+    # create_time 不应被更新
     assert got.create_time == orig.create_time
 
 
