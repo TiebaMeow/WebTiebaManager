@@ -128,7 +128,13 @@ async def get_current_user(data: Annotated[tuple[User, bool], Depends(parse_toke
     return data[0]
 
 
-async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
+async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):
+    if not data[1]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="系统访问权限不足",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return data[1]
 
 

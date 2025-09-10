@@ -18,7 +18,7 @@ from core.user.manager import User, UserManager
 from core.util.cache import ClearCache
 
 from .server import BaseResponse, app
-from .token import current_user_depends
+from .token import current_user_depends, system_access_depends
 
 
 class AnonymousClient:
@@ -164,7 +164,7 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
 
 
 @app.post("/api/cache/clear", tags=["cache"], description="手动清理缓存")
-async def clear_confirms(user: current_user_depends) -> BaseResponse[bool]:
+async def clear_confirms(system_access: system_access_depends) -> BaseResponse[bool]:
     await ClearCache.broadcast(None)
     return BaseResponse(data=True, message="操作成功")
 
