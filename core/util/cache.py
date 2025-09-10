@@ -10,6 +10,8 @@ from core.control import Controller
 from .event import AsyncEvent
 
 ClearCache = AsyncEvent[None]()
+Key = str
+PossibleKey = str | int | float
 
 
 class CacheCleaner:
@@ -70,9 +72,16 @@ class ExpireCache[T]:
         mem_max_size (int): 内存缓存最大数量，仅在 directory 为 None 时生效
     """
 
-    def __init__(self, directory: Path | None = None, *, expire_time: int | None = 86400, mem_max_size: int = 10000):
+    def __init__(
+        self,
+        directory: Path | None = None,
+        *,
+        expire_time: int | None = 86400,
+        mem_max_size: int = 10000,
+    ):
         self.cache = Cache()
         self.expire_time = expire_time
+
         if directory is None:
             self.cache.setup(f"mem://?size={mem_max_size}")
         else:
@@ -84,17 +93,20 @@ class ExpireCache[T]:
         self.listener.un_register()
         await self.cache.close()
 
-    async def set(self, key, data: T):
-        await self.cache.set(key, self.serialize_data(data), expire=self.expire_time)
+    def fmt_key(self, key: PossibleKey) -> Key:
+        return str(key)
 
-    async def get(self, key) -> T | None:
-        data = await self.cache.get(key, default=None)
+    async def set(self, key: PossibleKey, data: T):
+        await self.cache.set(self.fmt_key(key), self.serialize_data(data), expire=self.expire_time)
+
+    async def get(self, key: PossibleKey) -> T | None:
+        data = await self.cache.get(self.fmt_key(key), default=None)
         if data is not None:
             return self.deserialize_data(data)
         return None
 
-    async def delete(self, key) -> bool:
-        return await self.cache.delete(key)
+    async def delete(self, key: PossibleKey) -> bool:
+        return await self.cache.delete(self.fmt_key(key))
 
     async def expire(self, _=None) -> None:
         expired_keys = set()
