@@ -102,10 +102,7 @@ class User:
         需调用update_config进行初始化
         """
         self.config = config
-        self.listeners: list[EventListener] = [
-            Controller.DispatchContent.on(self.process),
-            Controller.Stop.on(self.stop),
-        ]
+        self.listeners: list[EventListener] = [Controller.DispatchContent.on(self.process)]
         self.client: TiebaClient | TiebaClientEmpty = TiebaClientEmpty()
         self.dir = USER_DIR / self.config.user.username
         if not self.dir.exists():
