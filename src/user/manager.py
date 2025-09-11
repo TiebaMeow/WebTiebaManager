@@ -54,7 +54,7 @@ class UserManager:
                 shutil.rmtree(cls.users[config.user.username].dir)
                 cls.users.pop(config.user.username)
             else:
-                raise ValueError(f"User {config.user.username} already exists")
+                raise ValueError(f"用户 {config.user.username} 已存在")
 
         user = await User.create(config)
         cls.users[config.user.username] = user
@@ -66,7 +66,7 @@ class UserManager:
     @classmethod
     async def delete_user(cls, username: str):
         if username not in cls.users:
-            raise ValueError(f"User {username} does not exist")
+            raise ValueError(f"用户 {username} 不存在")
 
         user = cls.users[username]
         shutil.rmtree(user.dir)
@@ -78,7 +78,7 @@ class UserManager:
     @classmethod
     async def update_config(cls, config: UserConfig):
         if config.user.username not in cls.users:
-            raise ValueError(f"User {config.user.username} does not exist")
+            raise ValueError(f"用户 {config.user.username} 不存在")
 
         await cls.users[config.user.username].update_config(config)
         await cls.UserConfigChange.broadcast(config)
@@ -98,16 +98,18 @@ class UserManager:
         new_config = user.config.model_copy(deep=True)
         new_config.enable = status
         await cls.update_config(new_config)
+
+        system_logger.info(f"{'启用' if status else '禁用'}用户 {username}")
+        user.logger.info(f"已{'启用' if status else '禁用'}")
+
         return True
 
     @classmethod
     async def enable_user(cls, username: str):
-        system_logger.info(f"启用用户 {username}")
         return await cls.change_user_status(username, True)
 
     @classmethod
     async def disable_user(cls, username: str):
-        system_logger.info(f"禁用用户 {username}")
         return await cls.change_user_status(username, False)
 
 
