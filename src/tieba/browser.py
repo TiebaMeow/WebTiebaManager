@@ -1,17 +1,16 @@
 import hashlib
 import json
 import time
-import traceback
 from typing import Literal, TypedDict
 
 import aiofiles
 import aiohttp
 from pydantic import BaseModel
 
-from src.typedef import Comment, Image, Post, User
-from src.util.tools import timestring
-from src.util.logging import exception_logger, system_logger
 from src.constance import BASE_DIR
+from src.typedef import Comment, Image, Post, User
+from src.util.logging import exception_logger, system_logger
+from src.util.tools import timestring
 
 
 class ResponseUser(TypedDict):
