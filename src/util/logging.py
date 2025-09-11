@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
+from aiotieba.logging import set_formatter
 from loguru import logger
 
 from src.constance import BASE_DIR
@@ -14,6 +16,10 @@ from .event import AsyncEvent
 
 if TYPE_CHECKING:
     from loguru import Message, Record
+
+set_formatter(
+    logging.Formatter("{asctime} [{levelname}] | aiotieba.{funcName} | {message}", "%Y-%m-%d %H:%M:%S", style="{")
+)
 
 
 class LogEventData(NamedTuple):
