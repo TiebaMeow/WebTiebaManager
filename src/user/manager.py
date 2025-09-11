@@ -4,6 +4,7 @@ from src.config import read_config, write_config
 from src.constance import USER_DIR
 from src.control import Controller
 from src.util.event import AsyncEvent
+from src.util.logging import system_logger
 
 from .user import User, UserConfig
 
@@ -37,6 +38,7 @@ class UserManager:
     async def load_users(cls, _: None = None):
         await cls.silent_load_users()
         await cls.UserChange.broadcast(None)
+        system_logger.info(f"加载 {len(cls.users)} 用户")
 
     @classmethod
     async def clear_users(cls, _: None = None):
@@ -59,6 +61,8 @@ class UserManager:
 
         write_config(config, user.dir / User.CONFIG_FILE)
 
+        system_logger.info(f"创建用户 {config.user.username}")
+
     @classmethod
     async def delete_user(cls, username: str):
         if username not in cls.users:
@@ -68,6 +72,8 @@ class UserManager:
         shutil.rmtree(user.dir)
 
         await cls.UserChange.broadcast(None)
+
+        system_logger.info(f"删除用户 {username}")
 
     @classmethod
     async def update_config(cls, config: UserConfig):
@@ -96,10 +102,12 @@ class UserManager:
 
     @classmethod
     async def enable_user(cls, username: str):
+        system_logger.info(f"启用用户 {username}")
         return await cls.change_user_status(username, True)
 
     @classmethod
     async def disable_user(cls, username: str):
+        system_logger.info(f"禁用用户 {username}")
         return await cls.change_user_status(username, False)
 
 

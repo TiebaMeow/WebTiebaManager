@@ -1,3 +1,5 @@
+from src.util.logging import system_logger
+
 from .config import SystemConfig, system_config, write_config
 from .typedef import Content
 from .util.event import AsyncEvent
@@ -14,19 +16,31 @@ class Controller:
 
     @classmethod
     async def start(cls):
+        if cls.running:
+            return
+
+        system_logger.info("系统开始运行")
         cls.running = True
         await cls.Start.broadcast(None)
 
     @classmethod
     async def stop(cls):
+        if not cls.running:
+            return
+
         cls.running = False
         await cls.Stop.broadcast(None)
+        system_logger.info("系统停止运行")
 
     @classmethod
     async def update_config(cls, new_config: SystemConfig):
+        if cls.config == new_config:
+            return
+
         cls.config = new_config
         write_config(new_config)
         await cls.SystemConfigChange.broadcast(None)
+        system_logger.info("系统配置已更改")
 
 
 Controller.config = system_config

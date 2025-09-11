@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
 from loguru import logger
 
-from .event import AsyncEvent
-
 from src.constance import BASE_DIR
+
+from .event import AsyncEvent
 
 if TYPE_CHECKING:
     from loguru import Message, Record
@@ -91,3 +92,31 @@ logger.add(
 
 LogRecorder.add("system")
 system_logger = logger.bind(name="system")
+
+
+@contextmanager
+def exception_logger(
+    message: str | None = None,
+    /,
+    logger=system_logger,
+    reraise: bool = False,
+    ignore_exceptions: list[type[Exception]] | None = None,
+):
+    try:
+        yield
+    except Exception as exc:
+        if ignore_exceptions:
+            # 支持 tuple 或 list，且类型检查更高效
+            if isinstance(ignore_exceptions, (list, tuple)):
+                if isinstance(exc, tuple(ignore_exceptions)):
+                    return
+            elif isinstance(exc, ignore_exceptions):
+                return
+
+        if message:
+            logger.exception(f"{message}: {exc}")
+        else:
+            logger.exception(f"捕获到异常: {exc}")
+
+        if reraise:
+            raise exc

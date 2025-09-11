@@ -23,6 +23,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from src.control import Controller
+from src.util.logging import system_logger
 
 from .config import DatabaseConfig
 from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
@@ -35,6 +36,8 @@ class Database:
     @classmethod
     async def startup(cls, _: None = None) -> None:
         config = Controller.config
+        system_logger.info("初始化数据库连接...")
+        system_logger.info(f"数据库类型: {config.database.type}")
         database_config = DatabaseConfig.model_validate(config.database)
         cls.engine = create_async_engine(
             database_config.database_url,
@@ -46,6 +49,7 @@ class Database:
 
     @classmethod
     async def teardown(cls, _: None = None) -> None:
+        system_logger.info("关闭数据库连接...")
         await cls.engine.dispose()
 
     @classmethod

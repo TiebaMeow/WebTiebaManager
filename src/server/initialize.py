@@ -5,6 +5,7 @@ from src.config import ServerConfig, SystemConfig
 from src.control import Controller
 from src.user.config import UserConfig, UserInfo
 from src.user.manager import UserManager
+from src.util.logging import system_logger
 
 from .server import BaseResponse, Server, app
 
@@ -34,7 +35,7 @@ class GetInitializeInfoData(BaseModel):
 @app.get("/api/initialize/get_info", tags=["initialize"])
 async def get_initialize_info() -> BaseResponse[GetInitializeInfoData]:
     return BaseResponse(
-        code=200, data=GetInitializeInfoData(need_system=await Server.need_system(), need_user=await Server.need_user())
+        code=200, data=GetInitializeInfoData(need_system=Server.need_system(), need_user=await Server.need_user())
     )
 
 
@@ -49,13 +50,15 @@ async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
         user_config = UserConfig(user=UserInfo.model_validate(request.user.model_dump()))
         await UserManager.new_user(user_config, force=True)
 
-    if await Server.need_system():
+    if Server.need_system():
         if not request.system:
             raise HTTPException(status_code=400, detail="请填写系统配置")
 
         system_config = SystemConfig(server=ServerConfig.model_validate(request.system.model_dump()))
         await Controller.update_config(system_config)
 
+    system_logger.info("系统初始化完成，正在重启服务...")
+    system_logger.info("如未能自动重启，请手动结束进程后重新运行")
     Server.need_restart = True
     await Server.shutdown()
     return BaseResponse(code=200, data=None)

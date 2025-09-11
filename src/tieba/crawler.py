@@ -4,7 +4,6 @@ import asyncio
 
 import aiotieba
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
 
 from src.constance import BASE_DIR, PID_CACHE_EXPIRE
 from src.control import Controller
@@ -12,17 +11,20 @@ from src.db.interface import ContentModel, Database
 from src.typedef import Comment, Post, Thread
 from src.user.manager import UserManager
 from src.util.cache import ClearCache, ExpireCache
-from src.util.tools import EtaSleep
+from src.util.logging import exception_logger, system_logger
+from src.util.tools import EtaSleep, Timer
 
 from .browser import TiebaBrowser
 
 
 @ClearCache.on
 async def clear_content_cache(_=None):
-    need_clear: list[int] = [
-        content.pid async for content in Database.iter_all_contents() if await Spider.cache.get(content.pid) is None
-    ]
-    await Database.delete_contents_by_pids(need_clear)
+    with Timer() as t:
+        need_clear: list[int] = [
+            content.pid async for content in Database.iter_all_contents() if await Spider.cache.get(content.pid) is None
+        ]
+        await Database.delete_contents_by_pids(need_clear)
+    system_logger.info(f"清理内容缓存，清理 {len(need_clear)} 条内容，耗时 {t.cost:.2f} 秒")
 
 
 class CrawlNeed(BaseModel):
@@ -36,6 +38,40 @@ class CrawlNeed(BaseModel):
             post=self.post or other.post,
             comment=self.comment or other.comment,
         )
+
+    def __sub__(self, other: CrawlNeed):
+        """
+        c1 - c2: c1将c2为True的内容设置为False
+        """
+        return CrawlNeed(
+            thread=self.thread and not other.thread,
+            post=self.post and not other.post,
+            comment=self.comment and not other.comment,
+        )
+
+    def __str__(self) -> str:
+        # return f"[{'T' if self.thread else '-'}{'P' if self.post else '-'}{'C' if self.comment else '-'}]"
+        return (
+            "["
+            + "/".join(
+                i
+                for i in (
+                    "主题贴" if self.thread else "",
+                    "回帖" if self.post else "",
+                    "楼中楼" if self.comment else "",
+                )
+                if i
+            )
+            + "]"
+        )
+
+    @classmethod
+    def empty(cls):
+        return cls(thread=False, post=False, comment=False)
+
+    @property
+    def is_empty(self):
+        return not (self.thread or self.post or self.comment)
 
 
 class Spider:
@@ -159,20 +195,58 @@ class Crawler:
 
     @classmethod
     async def update_needs(cls, _=None):
-        new_needs = {}
+        new_needs: dict[str, CrawlNeed] = {}
         for user in UserManager.users.values():
             forum = user.config.forum
             if user.enable and forum and user.config.rule_sets and forum.fname:
                 need = CrawlNeed(thread=forum.thread, post=forum.post, comment=forum.comment)
-                new_needs[forum.fname] = new_needs.get(forum.fname, CrawlNeed()) + need
-        cls.needs = new_needs
-        await cls.start_or_stop()
+                new_needs[forum.fname] = new_needs.get(forum.fname, CrawlNeed.empty()) + need
+
+        for fname, need in new_needs.copy().items():
+            if need.is_empty:
+                del new_needs[fname]
+
+        if cls.needs != new_needs:
+            need_add: dict[str, CrawlNeed] = {}
+            need_remove: dict[str, CrawlNeed] = {}
+
+            for fname, new_need in new_needs.items():
+                if fname not in cls.needs:
+                    need_add[fname] = new_need
+                elif new_need != cls.needs[fname]:
+                    old_need = cls.needs[fname]
+                    need_remove[fname] = old_need - new_need
+                    need_add[fname] = new_need - old_need
+
+            need_remove.update({fname: old_need for fname, old_need in cls.needs.items() if fname not in new_needs})
+
+            change_str = []
+
+            for fname in set(need_remove) | set(need_add):
+                if fname in need_add and not need_add[fname].is_empty:
+                    change_str.append(f"+ {fname}{need_add[fname]}")
+                if fname in need_remove and not need_remove[fname].is_empty:
+                    change_str.append(f"- {fname}{need_remove[fname]}")
+
+            if Controller.running:
+                if len(change_str) == 1:
+                    system_logger.info(f"更新爬虫监控需求：{change_str[0]}")
+                elif change_str:
+                    system_logger.info(f"更新爬虫监控需求：\n{'\n'.join(change_str)}")
+
+            cls.needs = new_needs
+            await cls.start_or_stop()
 
     @classmethod
     async def start_or_stop(cls, _: None = None):
         if cls.needs and not cls.task and Controller.running:
+            system_logger.info(f"启动爬虫，监控 {len(cls.needs)} 个贴吧")
             cls.task = asyncio.create_task(cls.crawl())
         elif (not cls.needs or not Controller.running) and cls.task:
+            if not Controller.running:
+                system_logger.info("停止爬虫")
+            elif not cls.needs:
+                system_logger.info("停止爬虫，没有需要监控的贴吧")
             cls.task.cancel()
             cls.task = None
 
@@ -185,19 +259,11 @@ class Crawler:
     @classmethod
     async def crawl(cls):
         while True:
-            try:
+            with exception_logger("爬虫循环异常"):
                 for forum, need in cls.needs.items():
                     async for content in cls.spider.crawl(forum, need):
-                        try:
-                            await Database.save_items([ContentModel.from_content(content)])
-                        except IntegrityError:
-                            pass
-
+                        await Database.save_items([ContentModel.from_content(content)])
                         await Controller.DispatchContent.broadcast(content)
-            except Exception:
-                from traceback import format_exc
-
-                print(format_exc())
             await asyncio.sleep(Controller.config.scan.loop_cd)
 
     @classmethod

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Form, HTTPException, status
+from fastapi import Depends, Form, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from src.control import Controller
 from src.user.manager import User, UserManager
+from src.util.logging import system_logger
 
 from .encryt import encrypt
 from .server import app
@@ -138,16 +139,26 @@ async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_tok
     return data[1]
 
 
+async def get_ip(request: Request):
+    if request.client:
+        return request.client.host
+    else:
+        return "unknown"
+
+
 current_user_depends = Annotated[User, Depends(get_current_user)]
 system_access_depends = Annotated[bool, Depends(get_system_access)]
+ip_depends = Annotated[str | None, Depends(get_ip)]
 
 
 @app.post("/api/login", tags=["token"])
-async def login_for_access_token(
-    form_data: Annotated[AdvancedOAuth2RequestForm, Depends()],
-) -> Token:
-    user = await authenticate_user(form_data.username, form_data.password)
-    system_access = await authenticate_system(form_data.key)
+async def login_for_access_token(form_data: Annotated[AdvancedOAuth2RequestForm, Depends()], ip: ip_depends) -> Token:
+    try:
+        user = await authenticate_user(form_data.username, form_data.password)
+        system_access = await authenticate_system(form_data.key)
+    except HTTPException as e:
+        system_logger.warning(f"用户 {form_data.username} 登录失败 IP: {ip}")
+        raise e
     access_token_expires = timedelta(days=Controller.config.server.token_expire_days)
     access_token = create_access_token(
         data=TokenData(
@@ -157,4 +168,5 @@ async def login_for_access_token(
         ).serialize(),
         expires_delta=access_token_expires,
     )
+    system_logger.info(f"用户 {user.username} 登录成功 IP: {ip} 系统权限: {'是' if system_access else '否'}")
     return Token(access_token=access_token, token_type="bearer")

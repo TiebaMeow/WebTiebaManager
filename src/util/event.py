@@ -17,13 +17,21 @@ class AsyncEvent[T]:
         if isinstance(fn, EventListener):
             fn = fn.fn
 
-        if not asyncio.iscoroutinefunction(fn):
+        error_msg = "事件处理函数执行异常"
+
+        from .logging import exception_logger
+
+        if asyncio.iscoroutinefunction(fn):
 
             async def async_fn(data: T):
-                fn(data)
+                with exception_logger(error_msg):
+                    await fn(data)
 
         else:
-            async_fn = fn  # type: ignore
+
+            async def async_fn(data: T):
+                with exception_logger(error_msg):
+                    fn(data)
 
         self._listeners.append(async_fn)
 

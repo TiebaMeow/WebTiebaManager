@@ -7,8 +7,8 @@ from src.util.tools import int_time, random_secret
 
 class ServerConfig(BaseModel, extra="ignore"):
     host: str = "0.0.0.0"
-    port: int = 36800
-    key: str
+    port: int = 36799
+    key: str = Field(default_factory=random_secret)
     secret_key: str = Field(default_factory=random_secret)
     log_level: Literal["info", "warning", "error"] = "warning"
     access_log: bool = False
@@ -20,3 +20,12 @@ class ServerConfig(BaseModel, extra="ignore"):
     @property
     def url(self):
         return f"http://{self.host}:{self.port}"
+
+    @property
+    def uvicorn_config_param(self):
+        return {
+            "host": self.host,
+            "port": self.port,
+            "log_level": self.log_level,
+            "access_log": self.access_log,
+        }
