@@ -10,6 +10,8 @@ from pydantic import BaseModel
 
 from src.typedef import Comment, Image, Post, User
 from src.util.tools import timestring
+from src.util.logging import exception_logger, system_logger
+from src.constance import BASE_DIR
 
 
 class ResponseUser(TypedDict):
@@ -65,6 +67,7 @@ class ResponsePage(TypedDict):
 
 class ResponseThread(TypedDict):
     title: str
+    id: int
 
 
 class ResponseForum(TypedDict):
@@ -133,52 +136,10 @@ class TiebaBrowser:
             data = json.loads(await res.text())
         return data["tbs"]
 
-    def post(
-        self,
-        url,
-        data=None,
-        need_tbs=False,
-        need_timestamp=False,
-        need_sign=True,
-        **kwargs,
-    ):
-        data = (
-            {key: value if isinstance(value, str) else str(value) for key, value in data.items()}
-            if data is not None
-            else {}
-        )
-        if need_tbs:
-            data["tbs"] = self._tbs
-        if need_timestamp:
-            data["timestamp"] = f"{time.time()}"
-        if need_sign:
-            self.__add_sign(data)
-        return self._session.post(url, data=data, allow_redirects=False, **kwargs)
-
-    async def get_posts(self, tid: int, pn: int = 1, rn: int = 30, comment_rn: int = 4, **kwargs) -> GetPostData:
-        data = {
-            "_client_type": 2,
-            "_client_version": "7.0.0",
-            "kz": tid,
-            "pn": pn,
-            "rn": rn,
-            "with_floor": 1,
-            "floor_rn": comment_rn,
-        }  # type: ignore
-        try:
-            res = await self.post(
-                "http://c.tieba.baidu.com/c/f/pb/page",
-                data,
-                need_tbs=True,
-                headers=self._hd,
-                **kwargs,
-            )
-            if res.status != 200:
-                return GetPostData()
-
-            data: GetPostsResponse = json.loads(await res.text())
-
-            if data["error_code"] != 0:
+    @staticmethod
+    async def parse_data(data: GetPostsResponse):
+        with exception_logger("爬虫数据解析失败"):
+            if data["error_code"] != 0 or "post_list" not in data:
                 return GetPostData()
 
             user_dict: dict[int, User] = {
@@ -222,7 +183,7 @@ class TiebaBrowser:
                         text=text,
                         images=images,
                         create_time=post["time"],
-                        tid=tid,
+                        tid=data["thread"]["id"],
                         pid=post["id"],
                         floor=post["floor"],
                     )
@@ -246,7 +207,7 @@ class TiebaBrowser:
                             text=text,
                             images=[],
                             create_time=comment["time"],
-                            tid=tid,
+                            tid=data["thread"]["id"],
                             pid=comment["id"],
                             floor=post["floor"],
                         )
@@ -258,15 +219,56 @@ class TiebaBrowser:
                 total_page=data["page"]["total_page"],
                 reply_num=reply_num,
             )
-        except Exception as e:
-            try:
-                async with aiofiles.open("fetch_post_data.json", "w", encoding="utf-8") as f:
-                    await f.write(json.dumps(data, ensure_ascii=False, indent=2))
-            except Exception:
-                pass
-            async with aiofiles.open("fetch_post_error.txt", "a", encoding="utf-8") as f:
-                await f.write(f"-----{timestring()}-----\n")
-                await f.write(f"{traceback.format_exc()}\n\n")
 
-            return GetPostData()
-            raise e
+        with exception_logger("保存爬虫错误数据失败"):
+            error_filename = BASE_DIR / "logs" / f"fetch_post_{timestring().replace(':', '-').replace(' ', '_')}.json"
+            async with aiofiles.open(error_filename, "w", encoding="utf-8") as f:
+                await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+            system_logger.error(f"原始数据已保存至 {error_filename}")
+
+        return GetPostData()
+
+    def post(
+        self,
+        url,
+        data=None,
+        need_tbs=False,
+        need_timestamp=False,
+        need_sign=True,
+        **kwargs,
+    ):
+        data = (
+            {key: value if isinstance(value, str) else str(value) for key, value in data.items()}
+            if data is not None
+            else {}
+        )
+        if need_tbs:
+            data["tbs"] = self._tbs
+        if need_timestamp:
+            data["timestamp"] = f"{time.time()}"
+        if need_sign:
+            self.__add_sign(data)
+        return self._session.post(url, data=data, allow_redirects=False, **kwargs)
+
+    async def get_posts(self, tid: int, pn: int = 1, rn: int = 30, comment_rn: int = 4, **kwargs) -> GetPostData:
+        data = {
+            "_client_type": 2,
+            "_client_version": "7.0.0",
+            "kz": tid,
+            "pn": pn,
+            "rn": rn,
+            "with_floor": 1,
+            "floor_rn": comment_rn,
+        }  # type: ignore
+        with exception_logger("获取帖子数据失败"):
+            res = await self.post(
+                "http://c.tieba.baidu.com/c/f/pb/page",
+                data,
+                need_tbs=True,
+                headers=self._hd,
+                **kwargs,
+            )
+            if res.status != 200:
+                return GetPostData()
+
+            return await self.parse_data(json.loads(await res.text()))
