@@ -13,6 +13,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "cashews[diskcache]>=7.4.1",
     "fastapi>=0.116.1",
+    "loguru>=0.7.3",
     "numpy>=2.3.2",
     "opencv-python-headless>=4.11.0.86",
     "passlib[bcrypt]>=1.7.4",
