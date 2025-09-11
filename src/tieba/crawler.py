@@ -125,10 +125,9 @@ class Spider:
             thread_mark = f"{thread.last_time}.{thread.reply_num}"
             cache_thread_mark = await self.cache.get(thread.pid)
             updated = (cache_thread_mark is None and thread.reply_num > 0) or (thread_mark != cache_thread_mark)
-            if cache_thread_mark is None and thread.reply_num > 0:
+
+            if cache_thread_mark is None and need.thread:
                 yield Thread.from_aiotieba_data(thread)
-            elif thread_mark != cache_thread_mark:
-                updated = True
 
             if not updated or (not need.post and not need.comment):
                 await self.cache.set(thread.pid, thread_mark)
@@ -165,11 +164,11 @@ class Spider:
                     continue
                 reply_num = reply_num_dict.get(post.pid, 0)
                 reply_num_cache = await self.cache.get(post.pid)
+
                 updated = (reply_num_cache is None and reply_num > 4) or (reply_num != reply_num_cache)
-                if reply_num_cache is None and reply_num > 4 and need.post:
+
+                if reply_num_cache is None and need.post:
                     yield post
-                elif reply_num != reply_num_cache:
-                    updated = True
 
                 if not updated or not need.post:
                     await self.cache.set(post.pid, reply_num)
@@ -183,7 +182,7 @@ class Spider:
                 await self.cache.set(post.pid, reply_num)
 
                 for comment in raw_comments:
-                    if await self.cache.get(comment.pid) is None:
+                    if await self.cache.get(comment.pid) is None and need.comment:
                         yield comment
                     await self.cache.set(comment.pid, 1)
 
@@ -234,6 +233,10 @@ class Crawler:
                 elif change_str:
                     system_logger.info(f"更新爬虫监控需求：\n{'\n'.join(change_str)}")
 
+                system_logger.debug(
+                    "当前爬虫监控需求：\n" + "\n".join(f"{fname}{need}" for fname, need in new_needs.items())
+                )
+
             cls.needs = new_needs
             await cls.start_or_stop()
 
@@ -262,6 +265,7 @@ class Crawler:
             with exception_logger("爬虫循环异常"):
                 for forum, need in cls.needs.items():
                     async for content in cls.spider.crawl(forum, need):
+                        system_logger.debug(f"爬取到新内容 {content.mark} 来自 {forum}")
                         await Database.save_items([ContentModel.from_content(content)])
                         await Controller.DispatchContent.broadcast(content)
             await asyncio.sleep(Controller.config.scan.loop_cd)
