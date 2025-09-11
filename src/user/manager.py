@@ -41,7 +41,7 @@ class UserManager:
     async def load_users(cls, _: None = None):
         await cls.silent_load_users()
         await cls.UserChange.broadcast(None)
-        system_logger.info(f"加载 {len(cls.users)} 用户")
+        system_logger.info(f"加载 {len(cls.users)} 个用户")
 
     @classmethod
     async def clear_users(cls, _: None = None):
