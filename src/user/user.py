@@ -96,13 +96,24 @@ class TiebaClient:
     async def delete(self, content: Content):
         self.logger.info(f"正在删除 {content.mark}", tid=content.tid, pid=content.pid)
         if content.type == "thread":
-            return await self._delete_thread(content.fname, tid=content.tid)
+            result = await self._delete_thread(content.fname, tid=content.tid)
         else:
-            return await self._delete_post(content.fname, tid=content.tid, pid=content.pid)
+            result = await self._delete_post(content.fname, tid=content.tid, pid=content.pid)
+
+        if not result:
+            self.logger.warning(f"删除失败 {content.mark} {result.err}", tid=content.tid, pid=content.pid)
+            return False
+
+        return True
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        self.logger.info(f"正在封禁 {content.user.log_name}", tid=content.tid, pid=content.pid)
-        return await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
+        self.logger.info(f"正在封禁 {content.user.log_name}", uid=content.user.user_id)
+        result = await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
+        if not result:
+            self.logger.warning(f"封禁失败 {content.user.log_name} {result.err}", uid=content.user.user_id)
+            return False
+
+        return True
 
 
 class User:
@@ -183,7 +194,12 @@ class User:
         obj = ProcessObject(content)
         result_rule_set = await self.processer.process(obj)
         if result_rule_set:
-            self.logger.info(f"{content.mark} 命中规则集 {result_rule_set.name}", tid=content.tid, pid=content.pid)
+            self.logger.info(
+                f"{content.mark} 命中 {result_rule_set.name}",
+                tid=content.tid,
+                pid=content.pid,
+                uid=content.user.user_id,
+            )
             await self.operate_rule_set(obj, result_rule_set)
 
     async def operate(self, obj: ProcessObject, og: OperationGroup):
