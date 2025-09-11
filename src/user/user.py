@@ -11,7 +11,7 @@ from src.process.process import Processer
 from src.process.typedef import ProcessObject
 from src.rule.operation import OperationGroup
 from src.tieba.info import TiebaInfo
-from src.util.logging import logger
+from src.util.logging import LogRecorder, logger
 from src.util.tools import int_time
 
 from .confirm import ConfirmCache, ConfirmData
@@ -80,7 +80,7 @@ class TiebaClient:
             await self.stop()
             return False
 
-        self.logger.info(f"已登录，用户名：{self.info.user_name}")
+        self.logger.info(f"贴吧登录成功 用户名：{self.info.user_name}")
         return True
 
     async def stop(self):
@@ -149,6 +149,7 @@ class User:
     @classmethod
     async def create(cls, config: UserConfig):
         user = cls(config)
+        LogRecorder.add(f"user.{user.username}")
         await user.update_config(config, initialize=True)
         user.logger.info("初始化完成")
         return user
@@ -161,6 +162,7 @@ class User:
             await self.client.stop()
 
         await self.confirm.stop()
+        LogRecorder.remove(f"user.{self.username}")
         self.logger.info("停止运行")
 
     async def update_config(self, new_config: UserConfig, initialize: bool = False):

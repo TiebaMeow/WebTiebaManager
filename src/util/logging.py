@@ -32,6 +32,8 @@ LogEvent = AsyncEvent[LogEventData]()
 DEV = "dev" in sys.argv or "--dev" in sys.argv
 DEBUG = "--debug" in sys.argv
 LOG_LEVEL = "DEBUG" if DEBUG else os.getenv("WEBTM_LOG_LEVEL", "INFO").upper()
+LOG_DIR = BASE_DIR / "logs"
+JSON_LOG_DIR = LOG_DIR / "json"
 
 
 def try_broadcast_log(message: Message):
@@ -96,11 +98,20 @@ logger.add(sys.stdout, format=log_format, filter=console_filter, level=LOG_LEVEL
 
 # 修改文件处理器：输出到 logos 文件夹下
 logger.add(
-    BASE_DIR / "logs" / "webtm_{time:YYYY-MM-DD}.log",
+    LOG_DIR / "webtm_{time:YYYY-MM-DD}.log",
     format=log_format,
     rotation="00:00",
     retention="1 month",
     level=LOG_LEVEL,
+)
+
+logger.add(
+    JSON_LOG_DIR / "webtm_{time:YYYY-MM-DD}.json",
+    format=log_format,
+    rotation="00:00",
+    retention="1 month",
+    level=LOG_LEVEL,
+    serialize=True,
 )
 
 LogRecorder.add("system")
