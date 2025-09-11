@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
 from loguru import logger
@@ -21,6 +22,10 @@ class LogEventData(NamedTuple):
 
 
 LogEvent = AsyncEvent[LogEventData]()
+
+DEV = "dev" in sys.argv or "--dev" in sys.argv
+DEBUG = "--debug" in sys.argv
+LOG_LEVEL = "DEBUG" if DEBUG else os.getenv("WEBTM_LOG_LEVEL", "INFO").upper()
 
 
 def try_broadcast_log(message: Message):
@@ -67,19 +72,21 @@ class LogRecorder:
 logger.remove()
 
 # 自定义格式
-log_format = "{time:YYYY-MM-DD HH:mm:ss,SSS} [{level}] | {extra[name]} | {message}"
+log_format = "{time:YYYY-MM-DD HH:mm:ss} [{level}] | {extra[name]} | {message}"
 
-logger.add(try_broadcast_log, format=log_format, level="DEBUG")
+logger.add(try_broadcast_log, format=log_format, level=LOG_LEVEL)
 
-logger.add(LogRecorder.sink, format=log_format, level="DEBUG")
+logger.add(LogRecorder.sink, format=log_format, level=LOG_LEVEL)
 
 
-# 控制台过滤器：name=="system" 或者 error级别的日志
+# 只在开发模式或调试模式下输出所有日志，否则只输出 system 日志和错误以上级别的日志
 def console_filter(record: Record):
+    if DEV or DEBUG:
+        return True
     return record["extra"].get("name") == "system" or record["level"].no >= logger.level("ERROR").no
 
 
-logger.add(sys.stdout, format=log_format, filter=console_filter, level="DEBUG")
+logger.add(sys.stdout, format=log_format, filter=console_filter, level=LOG_LEVEL)
 
 # 修改文件处理器：输出到 logos 文件夹下
 logger.add(
@@ -87,7 +94,7 @@ logger.add(
     format=log_format,
     rotation="00:00",
     retention="1 month",
-    level="DEBUG",
+    level=LOG_LEVEL,
 )
 
 LogRecorder.add("system")
