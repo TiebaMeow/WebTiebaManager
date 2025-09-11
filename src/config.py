@@ -34,6 +34,6 @@ system_config = read_config(CONFIG_PATH, SystemConfig)
 def write_config(config, path: Path = CONFIG_PATH):
     with Path(path).open(mode="w", encoding="utf8") as f:
         if path.suffix == ".toml":
-            tomlkit.dump(config.model_dump(), f)
+            tomlkit.dump(config.model_dump(exclude_none=True), f)
         else:
             yaml.dump(config.model_dump(), f, allow_unicode=True, indent=2)
