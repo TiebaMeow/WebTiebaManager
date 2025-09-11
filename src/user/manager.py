@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import shutil
 
 from src.config import read_config, write_config
@@ -6,7 +8,8 @@ from src.control import Controller
 from src.util.event import AsyncEvent
 from src.util.logging import system_logger
 
-from .user import User, UserConfig
+from .config import UserConfig
+from .user import User
 
 
 class UserManager:
