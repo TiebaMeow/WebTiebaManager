@@ -185,6 +185,7 @@ class TiebaBrowser:
                         tid=data["thread"]["id"],
                         pid=post["id"],
                         floor=post["floor"],
+                        reply_num=post["sub_post_number"],
                     )
                 )
                 reply_num[post["id"]] = post["sub_post_number"]

@@ -111,6 +111,8 @@ class BaseContent(BaseModel):
 
 class Thread(BaseContent, ContentInterface):
     floor: int = 1
+    last_time: int
+    reply_num: int
     type: Literal["thread"] = "thread"
 
     @classmethod
@@ -124,6 +126,8 @@ class Thread(BaseContent, ContentInterface):
             tid=data.tid,
             pid=data.pid,
             user=User.from_aiotieba_data(data),
+            last_time=data.last_time,
+            reply_num=data.reply_num,
         )
 
     @staticmethod
@@ -141,6 +145,7 @@ class Thread(BaseContent, ContentInterface):
 
 
 class Post(BaseContent, ContentInterface):
+    reply_num: int
     type: Literal["post"] = "post"
 
     @classmethod
@@ -154,6 +159,7 @@ class Post(BaseContent, ContentInterface):
             tid=data.tid,
             pid=data.pid,
             floor=data.floor,
+            reply_num=data.reply_num,
             user=User.from_aiotieba_data(data),
         )
 

@@ -12,21 +12,54 @@ pids = [1, 2, 3]
 result = await Database.get_contents_by_pids(pids)
 """
 
-from collections.abc import AsyncGenerator, Iterable
-from contextlib import asynccontextmanager
-from typing import Literal
+from __future__ import annotations
 
-from sqlalchemy import delete, select
+from contextlib import asynccontextmanager
+from enum import IntFlag
+from typing import TYPE_CHECKING, Literal
+
+import aiotieba.typing as aiotieba
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from src.control import Controller
+from src.typedef import Comment, Post
 from src.util.logging import system_logger
 
 from .config import DatabaseConfig
 from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterable
+    from datetime import datetime
+
+MixedContentType = aiotieba.Thread | Post | Comment
+
+
+class UpdateStatus(IntFlag):
+    """更新状态
+
+    Note:
+        NEW_WITH_CHILD: 包含子内容的新内容\n
+        NEW: 新内容\n
+        UPDATED: 有更新的内容\n
+        UNCHANGED: 无变化的内容
+        IS_NEW: 新内容（NEW | NEW_WITH_CHILD）\n
+        IS_STABLE: 无子内容（UNCHANGED | NEW）\n
+        HAS_CHANGES: 有变化的内容（UPDATED | NEW_WITH_CHILD）
+    """
+
+    NEW_WITH_CHILD = 1 << 0
+    NEW = 1 << 1
+    UPDATED = 1 << 2
+    UNCHANGED = 1 << 3
+
+    IS_NEW = NEW | NEW_WITH_CHILD
+    IS_STABLE = UNCHANGED | NEW
+    HAS_CHANGES = UPDATED | NEW_WITH_CHILD
 
 
 class Database:
@@ -197,19 +230,44 @@ class Database:
                 yield row
 
     @classmethod
-    async def get_all_pids(cls) -> set[int]:
+    async def check_and_update_cache(cls, content: MixedContentType) -> UpdateStatus:
         async with cls.get_session() as session:
-            result = await session.execute(select(ContentModel.pid))
-            return {row[0] for row in result.all()}
+            session.begin()
+            result = await session.execute(
+                select(ContentModel.last_time, ContentModel.reply_num).where(ContentModel.pid == content.pid)
+            )
+            row = result.first()
+            content_cache = None if row is None else (row[0], row[1])
+            await session.execute(
+                update(ContentModel)
+                .where(ContentModel.pid == content.pid)
+                .values(last_time=getattr(content, "last_time", None), reply_num=getattr(content, "reply_num", None))
+            )
+            await session.commit()
+
+        updated = UpdateStatus.UNCHANGED
+        if isinstance(content, aiotieba.Thread):
+            if content_cache is None:
+                updated = UpdateStatus.NEW_WITH_CHILD if content.reply_num > 0 else UpdateStatus.NEW
+            elif (content.last_time, content.reply_num) != content_cache:
+                updated = UpdateStatus.UPDATED
+        elif isinstance(content, Post):
+            if content_cache is None:
+                updated = UpdateStatus.NEW_WITH_CHILD if content.reply_num > 4 else UpdateStatus.NEW
+            elif (None, content.reply_num) != content_cache:
+                updated = UpdateStatus.UPDATED
+        elif isinstance(content, Comment):
+            if content_cache is None:
+                updated = UpdateStatus.NEW
+
+        return updated
 
     @classmethod
-    async def delete_contents_by_pids(cls, pids: Iterable[int]) -> None:
-        pid_list = list(pids)
-        if not pid_list:
-            return
+    async def clear_contents_before(cls, before: datetime) -> int:
         async with cls.get_session() as session:
-            await session.execute(delete(ContentModel).where(ContentModel.pid.in_(pid_list)))
+            result = await session.execute(delete(ContentModel).where(ContentModel.last_update < before))
             await session.commit()
+            return result.rowcount or 0
 
 
 Controller.Start.on(Database.startup)
