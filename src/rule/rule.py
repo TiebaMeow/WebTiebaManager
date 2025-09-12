@@ -1,18 +1,32 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, TypeAdapter
 
-from ..process.typedef import ProcessObject
+if TYPE_CHECKING:
+    from src.process.typedef import ProcessObject
 
 
 class RuleInfo(BaseModel):
-    type: str  # 类型，如UserNameRule、IpRule等
-    name: str  # 用户友善的名称
-    category: str  # 分类，如用户、帖子等
-    description: str  # 描述
-    series: str  # 基本类型，如Text, Limiter
-    values: dict[str, str] | None  # 用于CheckBox/Select，提供给网页端信息 {原键: 用户友好名称}
+    """规则信息
+
+    Attributes:
+        type (str): 类型，如UserNameRule、IpRule等
+        name (str): 用户友善的名称
+        category (str): 分类，如用户、帖子等
+        description (str): 描述
+        series (str): 基本类型，如Text, Limiter
+        values (dict[str, str] | None): 用于CheckBox/Select，提供给网页端信息 {原键: 用户友好名称}
+    """
+
+    type: str
+    name: str
+    category: str
+    description: str
+    series: str
+    values: dict[str, str] | None = None
 
 
 class RuleTemplate(BaseModel, ABC):
@@ -57,7 +71,7 @@ class Rules:
         default_options: Any = None,
         values: dict[str, str] | None = None,  # 用于CheckBox/Select，提供给网页端信息
     ):
-        def wrapper(rule: type["RuleTemplate"]):
+        def wrapper(rule: type[RuleTemplate]):
             nonlocal default_options
 
             if cls.rule_classes is None:

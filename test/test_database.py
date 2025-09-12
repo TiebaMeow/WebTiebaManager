@@ -39,7 +39,7 @@ class _DummyController:
 module.Controller = _DummyController  # type: ignore
 sys.modules["src.control"] = module
 
-import src.db.interface as dbi  # noqa: E402
+import src.db.interface as dbi
 
 Database = dbi.Database
 
@@ -103,18 +103,18 @@ async def test_save_items_empty(setup_db):
 
 @pytest.mark.asyncio
 async def test_save_items_chunk_none_or_nonpositive(setup_db):
-    items = [make_content(100), make_content(101)]
-    await Database.delete_contents_by_pids([100, 101])
+    # 使用不重复的 pid 避免依赖删除
+    items_none = [make_content(1000), make_content(1001)]
     # chunk_size=None
-    await Database.save_items(items, on_conflict="ignore", chunk_size=None)
-    got = await Database.get_contents_by_pids([100, 101])
-    assert {c.pid for c in got} == {100, 101}
-    # 再清理
-    await Database.delete_contents_by_pids([100, 101])
-    # chunk_size<=0
-    await Database.save_items(items, on_conflict="ignore", chunk_size=0)
-    got = await Database.get_contents_by_pids([100, 101])
-    assert {c.pid for c in got} == {100, 101}
+    await Database.save_items(items_none, on_conflict="ignore", chunk_size=None)
+    got = await Database.get_contents_by_pids([1000, 1001])
+    assert {c.pid for c in got} == {1000, 1001}
+
+    # 使用新的 pid 测试 chunk_size<=0
+    items_zero = [make_content(1002), make_content(1003)]
+    await Database.save_items(items_zero, on_conflict="ignore", chunk_size=0)
+    got2 = await Database.get_contents_by_pids([1002, 1003])
+    assert {c.pid for c in got2} == {1002, 1003}
 
 
 @pytest.mark.asyncio
@@ -149,63 +149,6 @@ def test_mixed_model_raise_type_error():
         asyncio.get_event_loop().run_until_complete(Database.save_items([f, c]))  # type: ignore
 
 
-@pytest.mark.skipif("RUN_DB_INTEGRATION" not in __import__("os").environ, reason="integration only")
-@pytest.mark.asyncio
-async def test_mysql_and_pg_integration(tmp_path_factory):
-    import os
-
-    from src.db.config import DatabaseConfig
-
-    # 保护现场：保存当前（由模块级 fixture 建立的）配置与引擎/会话工厂，
-    # 以免下面的集成测试污染后续用例的运行环境。
-    orig_config = getattr(dbi.Controller, "config", None)  # type: ignore
-    orig_engine = getattr(Database, "engine", None)
-    orig_sessionmaker = getattr(Database, "sessionmaker", None)
-
-    try:
-        # MySQL
-        mysql_cfg = DatabaseConfig(
-            type="mysql",
-            username=os.environ["MYSQL_USER"],
-            password=os.environ["MYSQL_PASSWORD"],
-            host=os.environ["MYSQL_HOST"],
-            port=int(os.environ["MYSQL_PORT"]),
-            db=os.environ["MYSQL_DB"],
-        )
-        dbi.Controller.config = types.SimpleNamespace(database=mysql_cfg)  # type: ignore
-        await Database.startup()
-        await Database.save_items([make_content(3001)], on_conflict="upsert")
-        got = await Database.get_contents_by_pids([3001])
-        assert got
-        assert got[0].pid == 3001
-        await Database.teardown()
-
-        # PostgreSQL
-        pg_cfg = DatabaseConfig(
-            type="postgresql",
-            username=os.environ["PG_USER"],
-            password=os.environ["PG_PASSWORD"],
-            host=os.environ["PG_HOST"],
-            port=int(os.environ["PG_PORT"]),
-            db=os.environ["PG_DB"],
-        )
-        dbi.Controller.config = types.SimpleNamespace(database=pg_cfg)  # type: ignore
-        await Database.startup()
-        await Database.save_items([make_content(4001)], on_conflict="upsert")
-        got = await Database.get_contents_by_pids([4001])
-        assert got
-        assert got[0].pid == 4001
-        await Database.teardown()
-    finally:
-        # 恢复现场：还原到模块级 sqlite 环境，保证后续测试继续使用原连接与数据。
-        if orig_config is not None:
-            dbi.Controller.config = orig_config  # type: ignore
-        if orig_engine is not None:
-            Database.engine = orig_engine
-        if orig_sessionmaker is not None:
-            Database.sessionmaker = orig_sessionmaker
-
-
 @pytest.mark.asyncio
 async def test_upsert_updates_selected_columns(setup_db):
     # 先取一个已有内容并尝试更新
@@ -230,13 +173,12 @@ async def test_upsert_updates_selected_columns(setup_db):
 @pytest.mark.asyncio
 async def test_images_serialize_deserialize_non_empty(setup_db):
     # 插入包含 images 的内容，验证能自动序列化到 JSON 并在读取时反序列化为 Image 模型
-    pid = 201
+    pid = 2201
     item = make_content(pid)
     item.images = [
         Image(hash="h1", width=10, height=20, src="http://x/1.jpg"),
         Image(hash="h2", width=30, height=40, src="http://x/2.jpg"),
     ]
-    await Database.delete_contents_by_pids([pid])
     await Database.save_items([item], on_conflict="ignore")
 
     got = (await Database.get_contents_by_pids([pid]))[0]
@@ -251,10 +193,9 @@ async def test_images_serialize_deserialize_non_empty(setup_db):
 @pytest.mark.asyncio
 async def test_upsert_updates_images_field(setup_db):
     # 先写入一条包含 1 张图片的记录
-    pid = 202
+    pid = 2202
     base = make_content(pid)
     base.images = [Image(hash="h1", width=1, height=1, src="s1")]
-    await Database.delete_contents_by_pids([pid])
     await Database.save_items([base], on_conflict="ignore")
 
     # upsert 更新为 2 张图片
@@ -274,12 +215,6 @@ async def test_upsert_updates_images_field(setup_db):
     await Database.save_items([updated2], on_conflict="upsert", exclude_columns=["images"])
     got2 = (await Database.get_contents_by_pids([pid]))[0]
     assert [img.hash for img in got2.images] == ["h2", "h3"]
-
-
-@pytest.mark.asyncio
-async def test_delete_noop_on_empty_list(setup_db):
-    # 空集合删除应直接返回且不抛错
-    await Database.delete_contents_by_pids([])
 
 
 @pytest.mark.asyncio
@@ -305,7 +240,99 @@ async def test_iter_all_and_delete(setup_db):
         seen_pids.add(row.pid)
     assert {1, 2, 3, 10, 11}.issubset(seen_pids)
 
-    # 删除两条并确认
-    await Database.delete_contents_by_pids([2, 3])
-    got = await Database.get_contents_by_pids([2, 3])
-    assert got == []
+    # 不再测试删除（方法已移除）
+
+
+@pytest.mark.asyncio
+async def test_is_updated_post_and_comment(setup_db):
+    import src.typedef as typedef
+
+    now_ts = int(datetime.now(SH_TZ).timestamp())
+    user = typedef.User(user_name="u", nick_name="n", user_id=98765, portrait="p", level=1)
+
+    # 1) Post
+    post_new = typedef.Post(
+        fname="f1",
+        title="t1",
+        text="x",
+        images=[],
+        create_time=now_ts,
+        tid=3001,
+        pid=3001,
+        floor=1,
+        reply_num=4,
+        user=user,
+    )
+    st1 = await Database.check_and_update_cache(post_new)
+    assert st1 == dbi.UpdateStatus.NEW
+    assert st1 & dbi.UpdateStatus.IS_NEW
+    assert st1 & dbi.UpdateStatus.IS_STABLE
+
+    post_new_child = typedef.Post(
+        fname="f1",
+        title="t1",
+        text="x",
+        images=[],
+        create_time=now_ts,
+        tid=3002,
+        pid=3002,
+        floor=1,
+        reply_num=5,
+        user=user,
+    )
+    st2 = await Database.check_and_update_cache(post_new_child)
+    assert st2 == dbi.UpdateStatus.NEW_WITH_CHILD
+    assert st2 & dbi.UpdateStatus.IS_NEW
+    assert st2 & dbi.UpdateStatus.HAS_CHANGES
+
+    await Database.save_items([ContentModel.from_content(post_new_child)])
+
+    post_new_child.reply_num = 10
+    st3 = await Database.check_and_update_cache(post_new_child)
+    assert st3 == dbi.UpdateStatus.UPDATED
+    assert st3 & dbi.UpdateStatus.HAS_CHANGES
+
+    st4 = await Database.check_and_update_cache(post_new_child)
+    assert st4 == dbi.UpdateStatus.UNCHANGED
+    assert st4 & dbi.UpdateStatus.IS_STABLE
+
+    # 2) Comment
+    comment_new = typedef.Comment(
+        fname="f2",
+        title="t2",
+        text="c",
+        images=[],
+        create_time=now_ts,
+        tid=4001,
+        pid=4001,
+        floor=2,
+        user=user,
+    )
+    st5 = await Database.check_and_update_cache(comment_new)
+    assert st5 == dbi.UpdateStatus.NEW
+
+
+@pytest.mark.asyncio
+async def test_clear_contents_before(setup_db):
+    # 构造三条记录，last_update 分别在过去 2 天、1 天和现在
+    now_dt = datetime.now(SH_TZ)
+    old_dt = now_dt - timedelta(days=2)
+    mid_dt = now_dt - timedelta(days=1)
+    new_dt = now_dt
+
+    a = make_content(5001)
+    a.last_update = old_dt
+    b = make_content(5002)
+    b.last_update = mid_dt
+    c = make_content(5003)
+    c.last_update = new_dt
+    await Database.save_items([a, b, c], on_conflict="ignore")
+
+    # 阈值设为 1.5 天前，只应删除 a
+    threshold = now_dt - timedelta(days=1, hours=12)
+    deleted = await Database.clear_contents_before(threshold)
+    assert deleted >= 1
+    got = await Database.get_contents_by_pids([5001, 5002, 5003])
+    left = {x.pid for x in got}
+    assert 5001 not in left
+    assert {5002, 5003}.issubset(left)

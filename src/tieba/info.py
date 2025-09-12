@@ -8,11 +8,10 @@ from src.control import Controller
 from src.db.interface import Database
 from src.process.typedef import ProcessObject
 from src.util.cache import ExpireCache
+from src.util.logging import exception_logger
 
 if TYPE_CHECKING:
     from aiotieba.typing import UserInfo
-
-from src.util.logging import exception_logger
 
 
 class TiebaInfo:

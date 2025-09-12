@@ -6,7 +6,7 @@ from pydantic import BaseModel, computed_field
 
 
 class DatabaseConfig(BaseModel, extra="ignore"):
-    type: Literal["sqlite", "postgresql", "mysql"]
+    type: Literal["sqlite", "postgresql"]
     path: str | None = None
     username: str | None = None
     password: str | None = None
@@ -27,12 +27,6 @@ class DatabaseConfig(BaseModel, extra="ignore"):
         if self.type == "postgresql":
             return (
                 f"postgresql+asyncpg://"
-                f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
-                f"@{self.host}:{self.port}/{self.db}"
-            )
-        elif self.type == "mysql":
-            return (
-                f"mysql+asyncmy://"
                 f"{quote_plus(self.username)}:{quote_plus(self.password)}"  # type: ignore
                 f"@{self.host}:{self.port}/{self.db}"
             )

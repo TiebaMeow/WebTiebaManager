@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import aiotieba
 from pydantic import BaseModel
 
-from src.constance import BASE_DIR, PID_CACHE_EXPIRE
+from src.constance import PID_CACHE_EXPIRE
 from src.control import Controller
-from src.db.interface import ContentModel, Database
+from src.db.interface import ContentModel, Database, UpdateStatus
 from src.typedef import Comment, Post, Thread
 from src.user.manager import UserManager
-from src.util.cache import ClearCache, ExpireCache
+from src.util.cache import ClearCache
 from src.util.logging import exception_logger, system_logger
 from src.util.tools import EtaSleep, Timer
 
@@ -20,12 +22,10 @@ from .browser import TiebaBrowser
 @ClearCache.on
 async def clear_content_cache(_=None):
     with Timer() as t:
-        db_pids = await Database.get_all_pids()
-        cache_pids = {int(i) for i in await Spider.cache.keys()}
-        need_clear: set[int] = db_pids - cache_pids
-        if need_clear:
-            await Database.delete_contents_by_pids(need_clear)
-            system_logger.info(f"清理内容缓存，清理 {len(need_clear)} 条内容，耗时 {t.cost:.2f} 秒")
+        clear_before = datetime.now(ZoneInfo("Asia/Shanghai")) - timedelta(seconds=PID_CACHE_EXPIRE)
+        clear_num = await Database.clear_contents_before(clear_before)
+        if clear_num:
+            system_logger.info(f"清理内容缓存，清理 {clear_num} 条内容，耗时 {t.cost:.2f} 秒")
         else:
             system_logger.info(f"清理内容缓存，无需清理，耗时 {t.cost:.2f} 秒")
 
@@ -78,9 +78,6 @@ class CrawlNeed(BaseModel):
 
 
 class Spider:
-    CACHE_DIR = BASE_DIR / "crawler_cache"
-    cache: ExpireCache[int | str] = ExpireCache(directory=CACHE_DIR, expire_time=PID_CACHE_EXPIRE)
-
     client: aiotieba.Client
     browser: TiebaBrowser
     eta: EtaSleep
@@ -125,20 +122,20 @@ class Spider:
                 raw_threads.extend(await self.client.get_threads(forum, pn=i))
 
         for thread in raw_threads:
-            thread_mark = f"{thread.last_time}.{thread.reply_num}"
-            cache_thread_mark = await self.cache.get(thread.pid)
-            updated = (cache_thread_mark is None and thread.reply_num > 0) or (thread_mark != cache_thread_mark)
+            updated = await Database.check_and_update_cache(thread)
 
-            if cache_thread_mark is None and need.thread:
+            # NEW or NEW_WITH_CHILD
+            if updated & UpdateStatus.IS_NEW and need.thread:
                 yield Thread.from_aiotieba_data(thread)
 
-            if not updated or (not need.post and not need.comment):
-                await self.cache.set(thread.pid, thread_mark)
+            # UNCHANGED or NEW
+            if updated & UpdateStatus.IS_STABLE or (not need.post and not need.comment):
                 continue
+
+            # UPDATED or NEW_WITH_CHILD
 
             raw_posts: list[Post] = []
             raw_comments: list[Comment] = []
-            reply_num_dict: dict[int, int] = {}
 
             async with self.eta:
                 data = await self.browser.get_posts(thread.tid, pn=1)
@@ -158,36 +155,27 @@ class Spider:
                         data = await self.browser.get_posts(thread.tid, pn=i)
                         raw_posts.extend(data.posts)
                         raw_comments.extend(data.comments)
-                        reply_num_dict.update(data.reply_num)
-
-            await self.cache.set(thread.pid, thread_mark)
 
             for post in raw_posts:
                 if post.floor == 1:
                     continue
-                reply_num = reply_num_dict.get(post.pid, 0)
-                reply_num_cache = await self.cache.get(post.pid)
+                updated = await Database.check_and_update_cache(post)
 
-                updated = (reply_num_cache is None and reply_num > 4) or (reply_num != reply_num_cache)
-
-                if reply_num_cache is None and need.post:
+                if updated & UpdateStatus.IS_NEW and need.post:
                     yield post
 
-                if not updated or not need.post:
-                    await self.cache.set(post.pid, reply_num)
+                if updated & UpdateStatus.IS_STABLE or not need.post:
                     continue
 
-                target_pn = (reply_num + 29) // 30
+                target_pn = (post.reply_num + 29) // 30
                 async with self.eta:
                     comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
                     raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
 
-                await self.cache.set(post.pid, reply_num)
-
                 for comment in raw_comments:
-                    if await self.cache.get(comment.pid) is None and need.comment:
+                    updated = await Database.check_and_update_cache(comment)
+                    if updated & UpdateStatus.IS_NEW and need.comment:
                         yield comment
-                    await self.cache.set(comment.pid, 1)
 
 
 class Crawler:
