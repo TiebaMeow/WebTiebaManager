@@ -147,6 +147,12 @@ class ExpireCache[T]:
 
         self.expire_time = new_expire_time
 
+    async def keys(self):
+        keys = set[Key]()
+        async for key in self.cache.scan("*"):
+            keys.add(key)
+        return keys
+
     @staticmethod
     def serialize_data(data: T):
         return data

@@ -20,11 +20,14 @@ from .browser import TiebaBrowser
 @ClearCache.on
 async def clear_content_cache(_=None):
     with Timer() as t:
-        need_clear: list[int] = [
-            content.pid async for content in Database.iter_all_contents() if await Spider.cache.get(content.pid) is None
-        ]
-        await Database.delete_contents_by_pids(need_clear)
-    system_logger.info(f"清理内容缓存，清理 {len(need_clear)} 条内容，耗时 {t.cost:.2f} 秒")
+        db_pids = await Database.get_all_pids()
+        cache_pids = {int(i) for i in await Spider.cache.keys()}
+        need_clear: set[int] = db_pids - cache_pids
+        if need_clear:
+            await Database.delete_contents_by_pids(need_clear)
+            system_logger.info(f"清理内容缓存，清理 {len(need_clear)} 条内容，耗时 {t.cost:.2f} 秒")
+        else:
+            system_logger.info(f"清理内容缓存，无需清理，耗时 {t.cost:.2f} 秒")
 
 
 class CrawlNeed(BaseModel):

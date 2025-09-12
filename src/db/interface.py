@@ -197,6 +197,12 @@ class Database:
                 yield row
 
     @classmethod
+    async def get_all_pids(cls) -> set[int]:
+        async with cls.get_session() as session:
+            result = await session.execute(select(ContentModel.pid))
+            return {row[0] for row in result.all()}
+
+    @classmethod
     async def delete_contents_by_pids(cls, pids: Iterable[int]) -> None:
         pid_list = list(pids)
         if not pid_list:
