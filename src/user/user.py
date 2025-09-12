@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from typing import TYPE_CHECKING, Literal
 
 import aiotieba
@@ -133,6 +134,7 @@ class User:
         self.confirm = ConfirmCache(self.dir, expire_time=self.config.process.confirm_expire)
         self.logger = logger.bind(name=f"user.{self.config.user.username}")
         self.client: TiebaClient | TiebaClientEmpty = TiebaClientEmpty(self.logger)
+        self.valid = False
 
     @property
     def enable(self):
@@ -152,18 +154,28 @@ class User:
         LogRecorder.add(f"user.{user.username}")
         await user.update_config(config, initialize=True)
         user.logger.info("初始化完成")
+        user.valid = True
         return user
 
     async def stop(self, _: None = None):
-        [i.un_register() for i in self.listeners]
-        self.listeners.clear()
+        # 执行此操作后，该user不应再被使用
+        if self.valid:
+            [i.un_register() for i in self.listeners]
+            self.listeners.clear()
 
-        if isinstance(self.client, TiebaClient):
-            await self.client.stop()
+            if isinstance(self.client, TiebaClient):
+                await self.client.stop()
 
-        await self.confirm.stop()
-        LogRecorder.remove(f"user.{self.username}")
-        self.logger.info("停止运行")
+            await self.confirm.stop()
+            LogRecorder.remove(f"user.{self.username}")
+            self.logger.info("停止运行")
+            self.valid = False
+
+    async def delete(self, _: None = None):
+        # 删除用户数据
+        await self.stop()
+        if self.dir.exists():
+            shutil.rmtree(self.dir)
 
     async def update_config(self, new_config: UserConfig, initialize: bool = False):
         if self.config == new_config and not initialize:

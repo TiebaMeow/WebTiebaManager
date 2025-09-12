@@ -72,7 +72,8 @@ class UserManager:
             raise ValueError(f"用户 {username} 不存在")
 
         user = cls.users[username]
-        shutil.rmtree(user.dir)
+        await user.delete()
+        cls.users.pop(username)
 
         await cls.UserChange.broadcast(None)
 
