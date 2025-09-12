@@ -22,12 +22,15 @@ from .token import current_user_depends, parse_token, system_access_depends
 
 if TYPE_CHECKING:
     import numpy as np
-    from fastapi import Request
     from loguru import Message
 
-    from src.rule.rule_set import RuleSetConfig
-    from src.user.config import ForumConfig, ProcessConfig
-    from src.user.confirm import ConfirmSimpleData
+# 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
+
+from fastapi import Request  # noqa: TC002
+
+from src.rule.rule_set import RuleSetConfig  # noqa: TC001
+from src.user.config import ForumConfig, ProcessConfig  # noqa: TC001
+from src.user.confirm import ConfirmSimpleData  # noqa: TC001
 
 
 class AnonymousClient:
