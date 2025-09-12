@@ -4,8 +4,8 @@ import types
 
 import pytest
 
-# 先注入一个最小可用的 core.control，避免真实依赖及循环导入
-module = types.ModuleType("core.control")
+# 先注入一个最小可用的 src.control，避免真实依赖及循环导入
+module = types.ModuleType("src.control")
 
 
 class _DummyEvent:
@@ -30,9 +30,9 @@ class _DummyController:
 
 
 module.Controller = _DummyController  # type: ignore
-sys.modules["core.control"] = module
+sys.modules["src.control"] = module
 
-import core.util.cache as cache  # noqa: E402
+import src.util.cache as cache  # noqa: E402
 
 
 @pytest.mark.asyncio
