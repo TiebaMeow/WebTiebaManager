@@ -169,11 +169,10 @@ class Database:
 
         stmt = None
         if dialect == "mysql":
-            stmt = mysql_insert(model)
-            if on_conflict == "ignore":
-                stmt = stmt.prefix_with("IGNORE")  # INSERT IGNORE
-            else:  # upsert
-                stmt = stmt.on_duplicate_key_update({name: stmt.inserted[name] for name in update_cols})
+            # 在 MySQL 中，如果 ON DUPLICATE KEY UPDATE 引用了未在 INSERT 列表中的列（例如值为 None 被省略），
+            # 会出现 Unknown column 'new.xxx' 错误。为兼容这一点，这里按批次动态计算可更新列，
+            # 仅更新本批 INSERT 列表中实际出现的列。
+            pass  # 延后到执行阶段按批次构建语句
 
         elif dialect == "postgresql":
             stmt = pg_insert(model)
@@ -195,6 +194,30 @@ class Database:
                 )
 
         async with cls.get_session() as session:
+            if dialect == "mysql":
+                for batch in batches:
+                    # 计算当前批次中 INSERT 实际包含的列（字典 keys 的并集）
+                    batch_keys: set[str] = set()
+                    for r in batch:
+                        batch_keys.update(r.keys())
+
+                    stmt_batch = mysql_insert(model)
+                    if on_conflict == "ignore":
+                        stmt_batch = stmt_batch.prefix_with("IGNORE")  # INSERT IGNORE
+                    else:  # upsert
+                        effective_update_cols = update_cols & batch_keys
+                        if not effective_update_cols:
+                            # 若没有可更新列，退化为 IGNORE 以避免冲突报错
+                            stmt_batch = stmt_batch.prefix_with("IGNORE")
+                        else:
+                            stmt_batch = stmt_batch.on_duplicate_key_update({
+                                name: stmt_batch.inserted[name] for name in effective_update_cols
+                            })
+
+                    await session.execute(stmt_batch.values(batch))
+                await session.commit()
+                return
+
             if stmt is not None:
                 for batch in batches:
                     await session.execute(stmt.values(batch))
