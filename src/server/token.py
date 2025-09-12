@@ -130,14 +130,18 @@ async def get_current_user(data: Annotated[tuple[User, bool], Depends(parse_toke
     return data[0]
 
 
-async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):
-    if not data[1]:
+async def get_system_acces(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
+    return data[1]
+
+
+async def ensure_system_access(system_acess: Annotated[tuple[bool], Depends(get_system_acces)]):
+    if not system_acess:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="系统访问权限不足",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return data[1]
+    return system_acess
 
 
 async def get_ip(request: Request):
@@ -148,7 +152,8 @@ async def get_ip(request: Request):
 
 
 current_user_depends = Annotated[User, Depends(get_current_user)]
-system_access_depends = Annotated[bool, Depends(get_system_access)]
+system_access_depends = Annotated[bool, Depends(get_system_acces)]
+ensure_system_access_depends = Annotated[bool, Depends(ensure_system_access)]
 ip_depends = Annotated[str | None, Depends(get_ip)]
 
 

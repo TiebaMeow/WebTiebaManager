@@ -80,11 +80,11 @@ class UserManager:
         system_logger.info(f"删除用户 {username}")
 
     @classmethod
-    async def update_config(cls, config: UserConfig):
+    async def update_config(cls, config: UserConfig, /, system_access: bool = False):
         if config.user.username not in cls.users:
             raise ValueError(f"用户 {config.user.username} 不存在")
 
-        await cls.users[config.user.username].update_config(config)
+        await cls.users[config.user.username].update_config(config, system_access=system_access)
         await cls.UserConfigChange.broadcast(config)
 
     @classmethod

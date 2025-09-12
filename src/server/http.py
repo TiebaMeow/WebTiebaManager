@@ -18,7 +18,7 @@ from src.util.cache import ClearCache
 from src.util.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
 
 from .server import BaseResponse, app
-from .token import current_user_depends, parse_token, system_access_depends
+from .token import current_user_depends, ensure_system_access_depends, parse_token, system_access_depends
 
 if TYPE_CHECKING:
     import numpy as np
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 from fastapi import Request  # noqa: TC002
 
 from src.rule.rule_set import RuleSetConfig  # noqa: TC001
-from src.user.config import ForumConfig, ProcessConfig  # noqa: TC001
+from src.user.config import ForumConfig, ProcessConfig, UserPermission  # noqa: TC001
 from src.user.confirm import ConfirmSimpleData  # noqa: TC001
 
 
@@ -69,6 +69,7 @@ class GetHomeInfoData(BaseModel):
     enable: bool
     forum: str
     account: GetHomeInfoAccount | None
+    permission: UserPermission
 
 
 @app.get("/api/user/info", tags=["user"])
@@ -85,6 +86,7 @@ async def get_home_info(user: current_user_depends) -> BaseResponse[GetHomeInfoD
             )
             if user.client.info
             else None,
+            permission=user.perm,
         ),
     )
 
@@ -110,7 +112,9 @@ async def get_user_config(user: current_user_depends) -> BaseResponse[UserConfig
 
 
 @app.post("/api/config/set_user", tags=["config"])
-async def set_user_config(user: current_user_depends, req: UserConfigData) -> BaseResponse[bool]:
+async def set_user_config(
+    user: current_user_depends, system_access: system_access_depends, req: UserConfigData
+) -> BaseResponse[bool]:
     config = user.config.model_copy(deep=True)
     if BDUSS_MOSAIC in req.forum.bduss:
         req.forum.bduss = user.config.forum.bduss
@@ -118,7 +122,10 @@ async def set_user_config(user: current_user_depends, req: UserConfigData) -> Ba
         req.forum.stoken = user.config.forum.stoken
     config.forum = req.forum
     config.process = req.process
-    await UserManager.update_config(config)
+    try:
+        await UserManager.update_config(config, system_access=system_access)
+    except PermissionError as e:
+        return BaseResponse(data=False, message=str(e), code=403)
 
     return BaseResponse(data=True)
 
@@ -134,10 +141,16 @@ async def get_rule_sets(user: current_user_depends) -> BaseResponse[list[RuleSet
 
 
 @app.post("/api/rule/set", tags=["rule"])
-async def set_rule_sets(user: current_user_depends, rule_sets: list[RuleSetConfig]) -> BaseResponse[bool]:
+async def set_rule_sets(
+    user: current_user_depends, system_access: system_access_depends, rule_sets: list[RuleSetConfig]
+) -> BaseResponse[bool]:
     config = user.config.model_copy(deep=True)
     config.rule_sets = rule_sets
-    await UserManager.update_config(config)
+    try:
+        await UserManager.update_config(config, system_access=system_access)
+    except PermissionError as e:
+        return BaseResponse(data=False, message=str(e), code=403)
+
     return BaseResponse(data=True)
 
 
@@ -176,7 +189,7 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
 
 
 @app.post("/api/cache/clear", tags=["cache"], description="手动清理缓存")
-async def clear_confirms(system_access: system_access_depends) -> BaseResponse[bool]:
+async def clear_confirms(system_access: ensure_system_access_depends) -> BaseResponse[bool]:
     await ClearCache.broadcast(None)
     return BaseResponse(data=True, message="操作成功")
 

@@ -12,6 +12,11 @@ class UserInfo(BaseModel):
     password_last_update: int = Field(default_factory=int_time)
 
 
+class UserPermission(BaseModel):
+    can_edit_forum: bool = True  # 用户是否有权限编辑监控贴吧
+    can_edit_rule_set: bool = True  # 用户是否有权限编辑规则集
+
+
 class ProcessConfig(BaseModel):
     mandatory_confirm: bool = False
     fast_process: bool = True
@@ -49,3 +54,4 @@ class UserConfig(BaseModel):
     forum: ForumConfig = Field(default_factory=ForumConfig)
     process: ProcessConfig = Field(default_factory=ProcessConfig)
     enable: bool = True
+    permission: UserPermission = Field(default_factory=UserPermission)

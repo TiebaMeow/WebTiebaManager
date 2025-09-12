@@ -148,6 +148,10 @@ class User:
     def fname(self) -> str:
         return self.config.forum.fname
 
+    @property
+    def perm(self):
+        return self.config.permission
+
     @classmethod
     async def create(cls, config: UserConfig):
         user = cls(config)
@@ -177,11 +181,19 @@ class User:
         if self.dir.exists():
             shutil.rmtree(self.dir)
 
-    async def update_config(self, new_config: UserConfig, initialize: bool = False):
+    async def update_config(self, new_config: UserConfig, /, initialize: bool = False, system_access: bool = False):
         if self.config == new_config and not initialize:
             return
 
         old_config = self.config
+
+        if not initialize and not system_access:
+            if new_config.forum.fname != old_config.forum.fname and not self.perm.can_edit_forum:
+                raise PermissionError("没有修改监控贴吧的权限")
+
+            if new_config.rule_sets != old_config.rule_sets and not self.perm.can_edit_rule_set:
+                raise PermissionError("没有修改规则集的权限")
+
         self.config = new_config
 
         self.processer = Processer(new_config)
