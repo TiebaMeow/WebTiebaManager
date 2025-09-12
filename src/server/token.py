@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Form, HTTPException, status, Request
+from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
@@ -37,6 +37,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 class Token(BaseModel):
     access_token: str
     token_type: str
+    system_access: bool
 
 
 class TokenData(BaseModel):
@@ -72,7 +73,7 @@ async def authenticate_user(username: str, password: str):
     return user
 
 
-async def authenticate_system(key: str | None):
+async def authenticate_system(key: str | None) -> bool:
     if not key:
         return False
 
@@ -169,4 +170,4 @@ async def login_for_access_token(form_data: Annotated[AdvancedOAuth2RequestForm,
         expires_delta=access_token_expires,
     )
     system_logger.info(f"用户 {user.username} 登录成功 IP: {ip} 系统权限: {'是' if system_access else '否'}")
-    return Token(access_token=access_token, token_type="bearer")
+    return Token(access_token=access_token, token_type="bearer", system_access=system_access)
