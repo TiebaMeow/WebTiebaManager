@@ -1,10 +1,14 @@
-from typing import Literal, TypedDict
+from __future__ import annotations
 
-from src.process.typedef import ProcessObject
+from typing import TYPE_CHECKING, Literal
+
 from src.tieba.info import TiebaInfo
 
 from .rule import Rules
 from .template import LimiterRule, TextRule
+
+if TYPE_CHECKING:
+    from src.process.typedef import ProcessObject
 
 user_register = Rules.fix_category("用户")
 

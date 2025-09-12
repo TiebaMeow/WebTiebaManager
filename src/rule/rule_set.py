@@ -1,9 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
 
 from src.rule.rule import RuleGroup, Rules
 
-from ..process.typedef import ProcessObject
 from .operation import STR_OPERATION, OperationGroup, Operations
+
+if TYPE_CHECKING:
+    from src.process.typedef import ProcessObject
 
 
 class RuleSetConfig(BaseModel):

@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, TypeAdapter
 
-from ..process.typedef import ProcessObject
+if TYPE_CHECKING:
+    from src.process.typedef import ProcessObject
 
 
 class RuleInfo(BaseModel):
@@ -68,7 +71,7 @@ class Rules:
         default_options: Any = None,
         values: dict[str, str] | None = None,  # 用于CheckBox/Select，提供给网页端信息
     ):
-        def wrapper(rule: type["RuleTemplate"]):
+        def wrapper(rule: type[RuleTemplate]):
             nonlocal default_options
 
             if cls.rule_classes is None:

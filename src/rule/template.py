@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import abc
 import re
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from src.process.typedef import ProcessObject
-
 from .rule import RuleTemplate
+
+if TYPE_CHECKING:
+    from src.process.typedef import ProcessObject
 
 
 class ContentRuleTemplate(abc.ABC):

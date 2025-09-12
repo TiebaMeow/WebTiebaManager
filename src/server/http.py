@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import io
 import json
@@ -5,17 +7,12 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 import cv2
-import numpy as np
-from fastapi import Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.constance import BDUSS_MOSAIC, STOKEN_MOSAIC
 from src.control import Controller
 from src.rule.rule import RuleInfo, Rules
-from src.rule.rule_set import RuleSetConfig
-from src.user.config import ForumConfig, ProcessConfig
-from src.user.confirm import ConfirmSimpleData
 from src.user.manager import User, UserManager
 from src.util.cache import ClearCache
 from src.util.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
@@ -24,7 +21,13 @@ from .server import BaseResponse, app
 from .token import current_user_depends, parse_token, system_access_depends
 
 if TYPE_CHECKING:
+    import numpy as np
+    from fastapi import Request
     from loguru import Message
+
+    from src.rule.rule_set import RuleSetConfig
+    from src.user.config import ForumConfig, ProcessConfig
+    from src.user.confirm import ConfirmSimpleData
 
 
 class AnonymousClient:
@@ -182,7 +185,7 @@ class LogData(BaseModel):
     extra: dict
 
     @staticmethod
-    def from_message(message: "Message") -> "LogData":
+    def from_message(message: Message) -> LogData:
         return LogData(
             message=message.rstrip("\n"),
             name=message.record["extra"].get("name", "unknown"),
