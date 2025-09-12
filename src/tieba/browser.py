@@ -5,7 +5,7 @@ from typing import Literal, TypedDict
 
 import aiofiles
 import aiohttp
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.constance import BASE_DIR
 from src.typedef import Comment, Image, Post, User
@@ -85,10 +85,10 @@ class GetPostsResponse(TypedDict):
 
 
 class GetPostData(BaseModel):
-    posts: list[Post] = []
-    comments: list[Comment] = []
+    posts: list[Post] = Field(default_factory=list)
+    comments: list[Comment] = Field(default_factory=list)
     total_page: int = 0
-    reply_num: dict[int, int] = {}
+    reply_num: dict[int, int] = Field(default_factory=dict)
 
 
 class TiebaBrowser:

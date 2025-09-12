@@ -45,7 +45,7 @@ class ForumConfig(BaseModel):
 
 class UserConfig(BaseModel):
     user: UserInfo
-    rule_sets: list[RuleSetConfig] = []
-    forum: ForumConfig = ForumConfig()
-    process: ProcessConfig = ProcessConfig()
+    rule_sets: list[RuleSetConfig] = Field(default_factory=list)
+    forum: ForumConfig = Field(default_factory=ForumConfig)
+    process: ProcessConfig = Field(default_factory=ProcessConfig)
     enable: bool = True
