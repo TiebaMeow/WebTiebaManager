@@ -61,7 +61,7 @@ def make_content(pid: int, *, tid: int = 1000, fname: str = "test_forum", floor:
 
 @pytest.mark.skipif("RUN_DB_INTEGRATION" not in __import__("os").environ, reason="integration only")
 @pytest.mark.asyncio
-async def test_mysql_and_pg_integration(tmp_path_factory):
+async def test_pg_integration(tmp_path_factory):
     import os
 
     # 保护现场：保存当前（由模块级 fixture 建立的）配置与引擎/会话工厂，
@@ -71,23 +71,6 @@ async def test_mysql_and_pg_integration(tmp_path_factory):
     orig_sessionmaker = getattr(Database, "sessionmaker", None)
 
     try:
-        # MySQL
-        mysql_cfg = DatabaseConfig(
-            type="mysql",
-            username=os.environ["MYSQL_USER"],
-            password=os.environ["MYSQL_PASSWORD"],
-            host=os.environ["MYSQL_HOST"],
-            port=int(os.environ["MYSQL_PORT"]),
-            db=os.environ["MYSQL_DB"],
-        )
-        dbi.Controller.config = types.SimpleNamespace(database=mysql_cfg)  # type: ignore
-        await Database.startup()
-        await Database.save_items([make_content(3001)], on_conflict="upsert")
-        got = await Database.get_contents_by_pids([3001])
-        assert got
-        assert got[0].pid == 3001
-        await Database.teardown()
-
         # PostgreSQL
         pg_cfg = DatabaseConfig(
             type="postgresql",

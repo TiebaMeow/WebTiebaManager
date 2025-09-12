@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba.typing as aiotieba
 from sqlalchemy import delete, select, update
-from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -112,7 +111,6 @@ class Database:
         兼容方言:
         - SQLite: ON CONFLICT DO NOTHING / DO UPDATE
         - PostgreSQL: ON CONFLICT DO NOTHING / DO UPDATE
-        - MySQL: INSERT IGNORE / ON DUPLICATE KEY UPDATE
 
         Attributes:
             items(Iterable[T]): 同一模型类型的实例序列。
@@ -167,66 +165,21 @@ class Database:
         else:
             batches = [rows]
 
-        stmt = None
-        if dialect == "mysql":
-            # 在 MySQL 中，如果 ON DUPLICATE KEY UPDATE 引用了未在 INSERT 列表中的列（例如值为 None 被省略），
-            # 会出现 Unknown column 'new.xxx' 错误。为兼容这一点，这里按批次动态计算可更新列，
-            # 仅更新本批 INSERT 列表中实际出现的列。
-            pass  # 延后到执行阶段按批次构建语句
+        stmt = pg_insert(model) if dialect == "postgresql" else sqlite_insert(model)
 
-        elif dialect == "postgresql":
-            stmt = pg_insert(model)
-            if on_conflict == "ignore":
-                stmt = stmt.on_conflict_do_nothing(index_elements=pk_index_elems)
-            else:  # upsert
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=pk_index_elems,
-                    set_={name: stmt.excluded[name] for name in update_cols},
-                )
-        elif dialect == "sqlite":
-            stmt = sqlite_insert(model)
-            if on_conflict == "ignore":
-                stmt = stmt.on_conflict_do_nothing(index_elements=pk_index_elems)
-            else:  # upsert
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=pk_index_elems,
-                    set_={name: stmt.excluded[name] for name in update_cols},
-                )
+        if on_conflict == "ignore":
+            stmt = stmt.on_conflict_do_nothing(index_elements=pk_index_elems)
+        else:  # upsert
+            stmt = stmt.on_conflict_do_update(
+                index_elements=pk_index_elems,
+                set_={name: stmt.excluded[name] for name in update_cols},
+            )
 
         async with cls.get_session() as session:
-            if dialect == "mysql":
-                for batch in batches:
-                    # 计算当前批次中 INSERT 实际包含的列（字典 keys 的并集）
-                    batch_keys: set[str] = set()
-                    for r in batch:
-                        batch_keys.update(r.keys())
-
-                    stmt_batch = mysql_insert(model)
-                    if on_conflict == "ignore":
-                        stmt_batch = stmt_batch.prefix_with("IGNORE")  # INSERT IGNORE
-                    else:  # upsert
-                        effective_update_cols = update_cols & batch_keys
-                        if not effective_update_cols:
-                            # 若没有可更新列，退化为 IGNORE 以避免冲突报错
-                            stmt_batch = stmt_batch.prefix_with("IGNORE")
-                        else:
-                            stmt_batch = stmt_batch.on_duplicate_key_update({
-                                name: stmt_batch.inserted[name] for name in effective_update_cols
-                            })
-
-                    await session.execute(stmt_batch.values(batch))
-                await session.commit()
-                return
-
             if stmt is not None:
                 for batch in batches:
                     await session.execute(stmt.values(batch))
                 await session.commit()
-                return
-
-            # 回退到普通 add_all（不支持冲突处理）
-            session.add_all(item_list)
-            await session.commit()
 
     @classmethod
     async def get_contents_by_pids(cls, pids: Iterable[int]) -> list[ContentModel]:
