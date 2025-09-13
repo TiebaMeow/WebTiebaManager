@@ -46,7 +46,7 @@ class TokenData(BaseModel):
     key_last_update: int | None
 
     def serialize(self):
-        return {"sub": self.username, "pwd_iat": self.password_last_update, "key_iad": self.key_last_update}
+        return {"sub": self.username, "pwd_iat": self.password_last_update, "key_iat": self.key_last_update}
 
     @classmethod
     def deserialize(cls, payload: dict):
