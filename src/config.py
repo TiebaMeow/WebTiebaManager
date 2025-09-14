@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from src.db.config import DatabaseConfig
 
 from .constance import BASE_DIR
-from .server.config import ServerConfig
+from .server import ServerConfig
 from .tieba.config import ScanConfig
 
 

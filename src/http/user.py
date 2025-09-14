@@ -13,8 +13,14 @@ from src.user.manager import User, UserManager
 from src.util.cache import ClearCache
 from src.util.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
 
-from ..server.server import BaseResponse, app
-from ..server.token import current_user_depends, ensure_system_access_depends, parse_token, system_access_depends
+from ..server import (
+    BaseResponse,
+    app,
+    current_user_depends,
+    ensure_system_access_depends,
+    parse_token,
+    system_access_depends,
+)
 
 if TYPE_CHECKING:
     from loguru import Message

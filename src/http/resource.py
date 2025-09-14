@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from src.control import Controller
 
-from ..server.server import app
+from ..server import app
 
 if TYPE_CHECKING:
     import numpy as np
