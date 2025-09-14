@@ -197,12 +197,13 @@ class User:
         self.config = new_config
 
         self.processer = Processer(new_config)
-        if new_config.forum.login_ready and (
-            new_config.forum.bduss != old_config.forum.bduss
-            or new_config.forum.stoken != old_config.forum.stoken
-            or initialize
-        ):
-            self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken, self.logger)
+        if new_config.forum.login_ready:
+            if (
+                new_config.forum.bduss != old_config.forum.bduss
+                or new_config.forum.stoken != old_config.forum.stoken
+                or initialize
+            ):
+                self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken, self.logger)
         else:
             self.client = TiebaClientEmpty(self.logger)
 
