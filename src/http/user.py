@@ -1,4 +1,4 @@
-from __future__ import annotations  # noqa: I001
+from __future__ import annotations
 
 import asyncio
 from typing import Literal
@@ -7,6 +7,11 @@ from pydantic import BaseModel
 
 from src.constance import BDUSS_MOSAIC, STOKEN_MOSAIC
 from src.rule.rule import RuleInfo, Rules
+
+# 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
+from src.rule.rule_set import RuleSetConfig  # noqa: TC001
+from src.user.config import ForumConfig, ProcessConfig, UserPermission  # noqa: TC001
+from src.user.confirm import ConfirmSimpleData  # noqa: TC001
 from src.user.manager import User, UserManager
 
 from ..server import (
@@ -15,12 +20,6 @@ from ..server import (
     current_user_depends,
     system_access_depends,
 )
-
-# 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
-
-from src.rule.rule_set import RuleSetConfig  # noqa: TC001
-from src.user.config import ForumConfig, ProcessConfig, UserPermission  # noqa: TC001
-from src.user.confirm import ConfirmSimpleData  # noqa: TC001
 
 
 class GetHomeInfoAccount(BaseModel):

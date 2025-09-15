@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 

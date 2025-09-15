@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from fastapi import HTTPException
 from pydantic import BaseModel
 
 from src.constance import BASE_DIR, CODE_EXPIRE
 from src.server import BaseResponse, app, ensure_system_access_depends
-from src.user.config import UserPermission
+from src.user.config import UserPermission  # noqa: TC001
 from src.user.manager import UserManager
 from src.util.cache import ClearCache, ExpireCache
 from src.util.logging import system_logger
