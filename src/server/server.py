@@ -58,6 +58,7 @@ class BaseResponse[T](BaseModel):
 class Server:
     need_restart: bool = False
     server: uvicorn.Server | None = None
+    _need_initialize: bool | None = None
 
     @classmethod
     def need_system(cls):
@@ -71,7 +72,10 @@ class Server:
 
     @classmethod
     async def need_initialize(cls):
-        return cls.need_system() or await cls.need_user()
+        if cls._need_initialize is None:
+            cls._need_initialize = cls.need_system() or await cls.need_user()
+
+        return cls._need_initialize
 
     @classmethod
     async def serve(cls):
