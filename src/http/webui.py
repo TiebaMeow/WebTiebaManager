@@ -38,7 +38,7 @@ class Proxy:
 
             for h in ["Transfer-Encoding", "Content-Encoding", "Server", "Date"]:
                 headers.pop(h, None)
-            return data, resp.status, resp.headers
+            return data, resp.status, headers
 
 
 Controller.Stop.on(Proxy.stop)
