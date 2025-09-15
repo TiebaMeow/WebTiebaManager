@@ -1,4 +1,3 @@
-import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -8,6 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.config import CONFIG_PATH
+from src.constance import DEV, MAIN_SERVER
 from src.control import Controller
 from src.tieba import crawler
 from src.user.manager import UserManager
@@ -15,7 +15,7 @@ from src.util.logging import exception_logger, system_logger
 
 from .config import ServerConfig
 
-HTTP_ALLOW_ORIGINS = ["*"]
+HTTP_ALLOW_ORIGINS = ["*" if DEV else MAIN_SERVER]
 
 
 @asynccontextmanager
@@ -58,6 +58,7 @@ class BaseResponse[T](BaseModel):
 class Server:
     need_restart: bool = False
     server: uvicorn.Server | None = None
+    _need_initialize: bool | None = None
 
     @classmethod
     def need_system(cls):
@@ -71,7 +72,10 @@ class Server:
 
     @classmethod
     async def need_initialize(cls):
-        return cls.need_system() or await cls.need_user()
+        if cls._need_initialize is None:
+            cls._need_initialize = cls.need_system() or await cls.need_user()
+
+        return cls._need_initialize
 
     @classmethod
     async def serve(cls):
@@ -110,7 +114,7 @@ class Server:
     def run(cls):
         try:
             with exception_logger("服务运行异常", reraise=True):
-                if "--dev" in sys.argv:
+                if DEV:
                     config = ServerConfig() if cls.need_system() else Controller.config.server
                     system_logger.warning("开发模式运行，请勿在生产环境使用")
                     system_logger.warning(f"访问 {config.url} 进行管理")

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, NamedTuple
 from aiotieba.logging import set_formatter
 from loguru import logger
 
-from src.constance import BASE_DIR
+from src.constance import BASE_DIR, DEBUG, DEV
 
 from .event import AsyncEvent
 
@@ -29,8 +29,7 @@ class LogEventData(NamedTuple):
 
 LogEvent = AsyncEvent[LogEventData]()
 
-DEV = "dev" in sys.argv or "--dev" in sys.argv
-DEBUG = "--debug" in sys.argv
+
 LOG_LEVEL = "DEBUG" if DEBUG else os.getenv("WEBTM_LOG_LEVEL", "INFO").upper()
 LOG_DIR = BASE_DIR / "logs"
 JSON_LOG_DIR = LOG_DIR / "json"
