@@ -4,8 +4,13 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 from src.constance import BASE_DIR, CODE_EXPIRE
-from src.server import BaseResponse, app, ensure_system_access_depends
-from src.user.config import UserPermission  # noqa: TC001
+from src.server import BaseResponse, app, ensure_system_access_depends, ip_depends
+from src.user.config import (
+    ForumConfig,
+    UserConfig,
+    UserInfo,
+    UserPermission,  # noqa: TC001
+)
 from src.user.manager import UserManager
 from src.util.cache import ClearCache, ExpireCache
 from src.util.logging import system_logger
@@ -108,3 +113,37 @@ async def create_invite_code(system_access: ensure_system_access_depends, req: U
 
     system_logger.info(f"创建邀请码 {req.code}")
     return BaseResponse(data=req.code, message="操作成功，邀请码七天内有效，请尽快使用")
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    code: str
+
+
+@app.post("/api/register", tags=["register"])
+async def register_user(req: RegisterRequest, ip: ip_depends) -> BaseResponse[bool]:
+    if UserManager.get_user(req.username):
+        return BaseResponse(code=400, data=False, message="用户名已存在")
+
+    if not (data := await CodeCache.get(req.code)):
+        return BaseResponse(code=400, data=False, message="邀请码无效")
+
+    config = UserConfig(
+        user=UserInfo(
+            username=req.username,
+            password=req.password,
+            code=req.code,
+        ),
+        permission=data.permission,
+        forum=ForumConfig(fname=data.forum),
+    )
+    try:
+        await UserManager.new_user(config)
+    except Exception as e:
+        return BaseResponse(data=False, message=str(e))
+
+    await CodeCache.delete(req.code)
+
+    system_logger.info(f"用户 {req.username} 注册成功 IP: {ip}")
+    return BaseResponse(data=True, message="注册成功，请使用用户名和密码登录")
