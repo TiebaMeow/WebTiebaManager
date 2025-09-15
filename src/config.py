@@ -2,19 +2,21 @@ from pathlib import Path
 
 import tomlkit
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.db.config import DatabaseConfig
 
 from .constance import BASE_DIR
-from .server.config import ServerConfig, random_secret
+from .server import ServerConfig
 from .tieba.config import ScanConfig
 
 
 class SystemConfig(BaseModel, extra="ignore"):
-    scan: ScanConfig = ScanConfig()
-    server: ServerConfig = ServerConfig()
-    database: DatabaseConfig = DatabaseConfig(type="sqlite", path=str(BASE_DIR / "data.db"))
+    scan: ScanConfig = Field(default_factory=ScanConfig)
+    server: ServerConfig = Field(default_factory=ServerConfig)
+    database: DatabaseConfig = Field(
+        default_factory=lambda: DatabaseConfig(type="sqlite", path=str(BASE_DIR / "data.db"))
+    )
     cleanup_time: str = "04:00"  # 缓存清理时间，格式如 "HH:MM"
 
 

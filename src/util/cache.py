@@ -147,6 +147,12 @@ class ExpireCache[T]:
 
         self.expire_time = new_expire_time
 
+    async def keys(self):
+        keys = set[Key]()
+        async for key in self.cache.scan("*"):
+            keys.add(key)
+        return keys
+
     @staticmethod
     def serialize_data(data: T):
         return data
@@ -154,6 +160,15 @@ class ExpireCache[T]:
     @staticmethod
     def deserialize_data(data) -> T:
         return data
+
+    async def items(self) -> list[tuple[Key, T]]:
+        """
+        返回所有缓存的 (key, 反序列化值) 列表
+        """
+        result = [
+            (key, self.deserialize_data(data)) async for key, data in self.cache.get_match("*") if data is not None
+        ]
+        return result
 
     async def values(self) -> list[T]:
         """

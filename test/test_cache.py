@@ -32,7 +32,7 @@ class _DummyController:
 module.Controller = _DummyController  # type: ignore
 sys.modules["src.control"] = module
 
-import src.util.cache as cache  # noqa: E402
+import src.util.cache as cache
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
@@ -7,7 +9,7 @@ from src.user.config import UserConfig, UserInfo
 from src.user.manager import UserManager
 from src.util.logging import system_logger
 
-from .server import BaseResponse, Server, app
+from ..server import BaseResponse, Server, app
 
 
 class UserRequest(BaseModel):

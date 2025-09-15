@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from typing import TYPE_CHECKING, Literal
 
 import aiotieba
@@ -133,6 +134,7 @@ class User:
         self.confirm = ConfirmCache(self.dir, expire_time=self.config.process.confirm_expire)
         self.logger = logger.bind(name=f"user.{self.config.user.username}")
         self.client: TiebaClient | TiebaClientEmpty = TiebaClientEmpty(self.logger)
+        self.valid = False
 
     @property
     def enable(self):
@@ -146,39 +148,62 @@ class User:
     def fname(self) -> str:
         return self.config.forum.fname
 
+    @property
+    def perm(self):
+        return self.config.permission
+
     @classmethod
     async def create(cls, config: UserConfig):
         user = cls(config)
         LogRecorder.add(f"user.{user.username}")
         await user.update_config(config, initialize=True)
         user.logger.info("初始化完成")
+        user.valid = True
         return user
 
     async def stop(self, _: None = None):
-        [i.un_register() for i in self.listeners]
-        self.listeners.clear()
+        # 执行此操作后，该user不应再被使用
+        if self.valid:
+            [i.un_register() for i in self.listeners]
+            self.listeners.clear()
 
-        if isinstance(self.client, TiebaClient):
-            await self.client.stop()
+            if isinstance(self.client, TiebaClient):
+                await self.client.stop()
 
-        await self.confirm.stop()
-        LogRecorder.remove(f"user.{self.username}")
-        self.logger.info("停止运行")
+            await self.confirm.stop()
+            LogRecorder.remove(f"user.{self.username}")
+            self.logger.info("停止运行")
+            self.valid = False
 
-    async def update_config(self, new_config: UserConfig, initialize: bool = False):
+    async def delete(self, _: None = None):
+        # 删除用户数据
+        await self.stop()
+        if self.dir.exists():
+            shutil.rmtree(self.dir)
+
+    async def update_config(self, new_config: UserConfig, /, initialize: bool = False, system_access: bool = False):
         if self.config == new_config and not initialize:
             return
 
         old_config = self.config
+
+        if not initialize and not system_access:
+            if new_config.forum.fname != old_config.forum.fname and not self.perm.can_edit_forum:
+                raise PermissionError("没有修改监控贴吧的权限")
+
+            if new_config.rule_sets != old_config.rule_sets and not self.perm.can_edit_rule_set:
+                raise PermissionError("没有修改规则集的权限")
+
         self.config = new_config
 
         self.processer = Processer(new_config)
-        if new_config.forum.login_ready and (
-            new_config.forum.bduss != old_config.forum.bduss
-            or new_config.forum.stoken != old_config.forum.stoken
-            or initialize
-        ):
-            self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken, self.logger)
+        if new_config.forum.login_ready:
+            if (
+                new_config.forum.bduss != old_config.forum.bduss
+                or new_config.forum.stoken != old_config.forum.stoken
+                or initialize
+            ):
+                self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken, self.logger)
         else:
             self.client = TiebaClientEmpty(self.logger)
 

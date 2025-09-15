@@ -8,8 +8,13 @@ from src.util.tools import int_time
 class UserInfo(BaseModel):
     username: str
     password: str
-    token: str = ""
+    code: str = ""
     password_last_update: int = Field(default_factory=int_time)
+
+
+class UserPermission(BaseModel):
+    can_edit_forum: bool = True  # 用户是否有权限编辑监控贴吧
+    can_edit_rule_set: bool = True  # 用户是否有权限编辑规则集
 
 
 class ProcessConfig(BaseModel):
@@ -45,7 +50,8 @@ class ForumConfig(BaseModel):
 
 class UserConfig(BaseModel):
     user: UserInfo
-    rule_sets: list[RuleSetConfig] = []
-    forum: ForumConfig = ForumConfig()
-    process: ProcessConfig = ProcessConfig()
+    rule_sets: list[RuleSetConfig] = Field(default_factory=list)
+    forum: ForumConfig = Field(default_factory=ForumConfig)
+    process: ProcessConfig = Field(default_factory=ProcessConfig)
     enable: bool = True
+    permission: UserPermission = Field(default_factory=UserPermission)

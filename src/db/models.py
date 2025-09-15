@@ -102,6 +102,12 @@ class ContentModel(Base):
     images: Mapped[list[Image]] = mapped_column(ModelListType(Image), nullable=False, default=list)
     type: Mapped[str] = mapped_column(String(255), nullable=False)
 
+    last_time: Mapped[int | None] = mapped_column(BIGINT, nullable=True, default=None)
+    reply_num: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    last_update: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, default=now_with_tz, onupdate=now_with_tz, nullable=False
+    )
+
     author_id: Mapped[int] = mapped_column(BIGINT, index=True)
 
     forum: Mapped[ForumModel] = relationship(
@@ -132,6 +138,8 @@ class ContentModel(Base):
             floor=content.floor,
             images=content.images,
             type=content.type,
+            last_time=getattr(content, "last_time", None),
+            reply_num=getattr(content, "reply_num", None),
             author_id=content.user.user_id,
         )
 

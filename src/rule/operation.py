@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
+
+from src.tieba.info import TiebaInfo
 
 if TYPE_CHECKING:
     from src.process.typedef import ProcessObject
-
-from src.tieba.info import TiebaInfo
 
 
 class OperationTemplate(BaseModel):
@@ -94,7 +94,7 @@ class DeleteOptions(BaseModel):
 @Operations.register
 class Delete(OperationTemplate):
     type: Literal["delete"] = "delete"
-    options: DeleteOptions = DeleteOptions()
+    options: DeleteOptions = Field(default_factory=DeleteOptions)
 
     async def store_data(self, obj: ProcessObject, data: dict[str, Any]) -> None:
         if data.get("is_thread_author") is None:
@@ -109,4 +109,4 @@ class BlockOptions(BaseModel):
 @Operations.register
 class Block(OperationTemplate):
     type: Literal["block"] = "block"
-    options: BlockOptions = BlockOptions()
+    options: BlockOptions = Field(default_factory=BlockOptions)

@@ -1,8 +1,16 @@
+__all__ = [
+    "parse_token",
+    "current_user_depends",
+    "system_access_depends",
+    "ensure_system_access_depends",
+    "ip_depends",
+]
+
 from datetime import datetime, timedelta
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Form, HTTPException, status, Request
+from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
@@ -37,6 +45,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 class Token(BaseModel):
     access_token: str
     token_type: str
+    system_access: bool
 
 
 class TokenData(BaseModel):
@@ -45,7 +54,7 @@ class TokenData(BaseModel):
     key_last_update: int | None
 
     def serialize(self):
-        return {"sub": self.username, "pwd_iat": self.password_last_update, "key_iad": self.key_last_update}
+        return {"sub": self.username, "pwd_iat": self.password_last_update, "key_iat": self.key_last_update}
 
     @classmethod
     def deserialize(cls, payload: dict):
@@ -72,7 +81,7 @@ async def authenticate_user(username: str, password: str):
     return user
 
 
-async def authenticate_system(key: str | None):
+async def authenticate_system(key: str | None) -> bool:
     if not key:
         return False
 
@@ -129,14 +138,18 @@ async def get_current_user(data: Annotated[tuple[User, bool], Depends(parse_toke
     return data[0]
 
 
-async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):
-    if not data[1]:
+async def get_system_access(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
+    return data[1]
+
+
+async def ensure_system_access(system_access: Annotated[tuple[bool], Depends(get_system_access)]):
+    if not system_access:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="系统访问权限不足",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return data[1]
+    return system_access
 
 
 async def get_ip(request: Request):
@@ -148,6 +161,7 @@ async def get_ip(request: Request):
 
 current_user_depends = Annotated[User, Depends(get_current_user)]
 system_access_depends = Annotated[bool, Depends(get_system_access)]
+ensure_system_access_depends = Annotated[bool, Depends(ensure_system_access)]
 ip_depends = Annotated[str | None, Depends(get_ip)]
 
 
@@ -169,4 +183,4 @@ async def login_for_access_token(form_data: Annotated[AdvancedOAuth2RequestForm,
         expires_delta=access_token_expires,
     )
     system_logger.info(f"用户 {user.username} 登录成功 IP: {ip} 系统权限: {'是' if system_access else '否'}")
-    return Token(access_token=access_token, token_type="bearer")
+    return Token(access_token=access_token, token_type="bearer", system_access=system_access)
