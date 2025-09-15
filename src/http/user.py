@@ -10,14 +10,12 @@ from pydantic import BaseModel
 from src.constance import BDUSS_MOSAIC, STOKEN_MOSAIC
 from src.rule.rule import RuleInfo, Rules
 from src.user.manager import User, UserManager
-from src.util.cache import ClearCache
 from src.util.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
 
 from ..server import (
     BaseResponse,
     app,
     current_user_depends,
-    ensure_system_access_depends,
     parse_token,
     system_access_depends,
 )
@@ -162,12 +160,6 @@ async def confirm_operation(user: current_user_depends, request: ConfirmRequest)
     else:
         asyncio.create_task(confirm_many(user, request.pid, request.action))
         return BaseResponse(data=True, message="正在批量执行操作，请稍后查看结果")
-
-
-@app.post("/api/cache/clear", tags=["cache"], description="手动清理缓存")
-async def clear_confirms(system_access: ensure_system_access_depends) -> BaseResponse[bool]:
-    await ClearCache.broadcast(None)
-    return BaseResponse(data=True, message="操作成功")
 
 
 class LogData(BaseModel):

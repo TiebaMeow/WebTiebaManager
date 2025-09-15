@@ -1,0 +1,108 @@
+from fastapi import HTTPException
+from pydantic import BaseModel
+
+from src.constance import BASE_DIR, CODE_EXPIRE
+from src.server import BaseResponse, app, ensure_system_access_depends
+from src.user.config import UserPermission
+from src.user.manager import UserManager
+from src.util.cache import ClearCache, ExpireCache
+from src.util.logging import system_logger
+from src.util.tools import random_secret
+
+
+@app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")
+async def clear_confirms(system_access: ensure_system_access_depends) -> BaseResponse[bool]:
+    await ClearCache.broadcast(None)
+    return BaseResponse(data=True, message="操作成功")
+
+
+class UserInfodata(BaseModel):
+    username: str
+    permission: UserPermission
+    forum: str
+    code: str
+    use: bool = False
+
+
+CodeCache = ExpireCache[UserInfodata](expire_time=CODE_EXPIRE, directory=BASE_DIR / "code")
+
+
+@app.get("/api/system/get_users_info", tags=["system"])
+async def get_users_info(system_access: ensure_system_access_depends) -> BaseResponse[list[UserInfodata]]:
+    data = [
+        UserInfodata(
+            username=user.username, permission=user.perm, forum=user.fname, code=user.config.user.code, use=True
+        )
+        for user in UserManager.users.values()
+    ]
+    existed_code = {u.config.user.code for u in UserManager.users.values()}
+    data.extend(info for key, info in await CodeCache.items() if key not in existed_code)
+    return BaseResponse(data=data)
+
+
+@app.post("/api/system/set_user_info", tags=["system"])
+async def set_user_info(system_access: ensure_system_access_depends, req: UserInfodata) -> BaseResponse[bool]:
+    if req.username and (user := UserManager.get_user(req.username)):
+        config = user.config.model_copy(deep=True)
+        config.permission = req.permission
+        config.forum.fname = req.forum
+        await UserManager.update_config(config, system_access=system_access)
+    elif req.code and (data := await CodeCache.get(req.code)):
+        data.username = req.username
+        data.permission = req.permission
+        data.forum = req.forum
+        await CodeCache.set(req.code, data)
+        system_logger.info(f"更新邀请码 {req.code} 信息")
+    else:
+        return BaseResponse(data=False, message="用户不存在或邀请码无效", code=400)
+
+    return BaseResponse(data=True, message="操作成功")
+
+
+class DeleteRequest(BaseModel):
+    username: str = ""
+    code: str = ""
+
+
+@app.post("/api/system/delete_user", tags=["system"])
+async def delete_user(system_access: ensure_system_access_depends, req: DeleteRequest) -> BaseResponse[bool]:
+    if req.username and UserManager.get_user(req.username):
+        if len(UserManager.users.keys()) <= 1:
+            return BaseResponse(code=400, data=False, message="不能删除最后一个用户")
+
+        try:
+            await UserManager.delete_user(req.username)
+        except Exception as e:
+            return BaseResponse(data=False, message=str(e))
+    elif req.code and await CodeCache.get(req.code):
+        await CodeCache.delete(req.code)
+
+        system_logger.info(f"删除邀请码 {req.code}")
+    else:
+        return BaseResponse(code=400, data=False, message="用户不存在或邀请码无效")
+
+    return BaseResponse(data=True, message="操作成功")
+
+
+@app.post("/api/system/create_invite_code", tags=["system"])
+async def create_invite_code(system_access: ensure_system_access_depends, req: UserInfodata) -> BaseResponse[str]:
+    if not req.code:
+        for _ in range(10):
+            req.code = random_secret(4)
+            if CodeCache.get(req.code) is None:
+                break
+        else:
+            raise HTTPException(status_code=500, detail="邀请码生成失败，请稍后重试")
+
+    if req.username:
+        return BaseResponse(code=400, data="", message="创建邀请码时用户名必须为空")
+
+    while any(u.config.user.code == req.code for u in UserManager.users.values()):
+        return BaseResponse(code=400, data="", message="邀请码已存在，请更换后重试")
+    if await CodeCache.get(req.code):
+        return BaseResponse(code=400, data="", message="邀请码已存在，请更换后重试")
+
+    await CodeCache.set(req.code, req)
+
+    system_logger.info(f"创建邀请码 {req.code}")
+    return BaseResponse(data=req.code, message="操作成功，邀请码七天内有效，请尽快使用")

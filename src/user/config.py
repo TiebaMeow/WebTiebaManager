@@ -8,7 +8,7 @@ from src.util.tools import int_time
 class UserInfo(BaseModel):
     username: str
     password: str
-    token: str = ""
+    code: str = ""
     password_last_update: int = Field(default_factory=int_time)
 
 

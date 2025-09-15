@@ -161,6 +161,15 @@ class ExpireCache[T]:
     def deserialize_data(data) -> T:
         return data
 
+    async def items(self) -> list[tuple[Key, T]]:
+        """
+        返回所有缓存的 (key, 反序列化值) 列表
+        """
+        result = [
+            (key, self.deserialize_data(data)) async for key, data in self.cache.get_match("*") if data is not None
+        ]
+        return result
+
     async def values(self) -> list[T]:
         """
         返回所有缓存的反序列化值列表
