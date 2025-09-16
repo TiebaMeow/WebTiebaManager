@@ -20,10 +20,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.ps1 | iex
-          $env:PATH = "$env:USERPROFILE\.cargo\bin;" + $env:PATH
-        shell: pwsh
+        uses: astral-sh/setup-uv@v6
 
       - name: Sync dependencies with uv
         run: uv sync --frozen
