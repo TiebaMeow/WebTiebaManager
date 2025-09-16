@@ -1,0 +1,61 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.ps1 | iex
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;" + $env:PATH
+        shell: pwsh
+
+      - name: Sync dependencies with uv
+        run: uv sync --frozen
+        shell: pwsh
+
+      - name: Install PyInstaller
+        run: uv pip install pyinstaller
+        shell: pwsh
+
+      - name: Get tag name
+        id: get_tag
+        run: echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build executable with PyInstaller
+        run: |
+          $TAG = "${{ steps.get_tag.outputs.tag }}"
+          $EXE_NAME = "webtm_$TAG"
+          uv run pyinstaller --noconfirm --onefile --name $EXE_NAME --hidden-import="passlib.handlers.bcrypt" --hidden-import="aiosqlite" start.py
+        shell: pwsh
+
+      - name: Zip exe file
+        run: |
+          $TAG = "${{ steps.get_tag.outputs.tag }}"
+          $EXE_NAME = "webtm_$TAG.exe"
+          $ZIP_NAME = "webtm_$TAG.zip"
+          Compress-Archive -Path "dist/$EXE_NAME" -DestinationPath "dist/$ZIP_NAME"
+        shell: pwsh
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/webtm_${{ steps.get_tag.outputs.tag }}.zip
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          draft: true
