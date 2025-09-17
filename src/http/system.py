@@ -128,7 +128,7 @@ class RegisterRequest(BaseModel):
     @classmethod
     def validate_password(cls, v):
         if not validate_password(v):
-            raise ValueError("密码长度至少8位，且包含大小写字母、数字和特殊字符")
+            raise ValueError("密码格式不正确")
         return v
 
 
