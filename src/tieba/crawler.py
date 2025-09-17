@@ -98,7 +98,7 @@ class Spider:
 
     def update_config(self, data: UpdateEventData[SystemConfig]):
         if data.old.scan.query_cd != data.new.scan.query_cd:
-            self.eta = EtaSleep(Controller.config.scan.query_cd)
+            self.eta = EtaSleep(data.new.scan.query_cd)
 
     async def init_client(self):
         if self.client is None:
