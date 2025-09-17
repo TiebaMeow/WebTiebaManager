@@ -25,6 +25,8 @@ PROGRAM_NAME = "WebTM"
 USER_DIR = BASE_DIR / "users"
 LOG_FILE_NAME = "webtm.log"
 LOG_DIR = BASE_DIR / "logs"
+SYSTEM_CONFIG_PATH = BASE_DIR / "config.toml"
+
 
 DEFAULT_SERVER_PORT = 36799
 

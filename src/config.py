@@ -28,12 +28,7 @@ def read_config[T](path: Path, obj: type[T]) -> T:
         return obj.model_validate({})  # type: ignore
 
 
-CONFIG_PATH = BASE_DIR / "config.toml"
-
-system_config = read_config(CONFIG_PATH, SystemConfig)
-
-
-def write_config(config, path: Path = CONFIG_PATH):
+def write_config(config, path: Path):
     with Path(path).open(mode="w", encoding="utf8") as f:
         if path.suffix == ".toml":
             tomlkit.dump(config.model_dump(exclude_none=True), f)

@@ -6,8 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.config import CONFIG_PATH
-from src.constance import DEV, MAIN_SERVER
+from src.constance import DEV, MAIN_SERVER, SYSTEM_CONFIG_PATH
 from src.control import Controller
 from src.tieba import crawler
 from src.user.manager import UserManager
@@ -62,7 +61,7 @@ class Server:
 
     @classmethod
     def need_system(cls):
-        return not CONFIG_PATH.exists()
+        return not SYSTEM_CONFIG_PATH.exists()
 
     @classmethod
     async def need_user(cls):
