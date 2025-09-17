@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from src.constance import BDUSS_MOSAIC, STOKEN_MOSAIC
+from src.constance import COOKIE_MIN_MOSAIC_LENGTH
 from src.rule.rule import RuleInfo, Rules
 
 # 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
@@ -13,6 +13,7 @@ from src.rule.rule_set import RuleSetConfig  # noqa: TC001
 from src.user.config import ForumConfig, ProcessConfig, UserPermission  # noqa: TC001
 from src.user.confirm import ConfirmSimpleData  # noqa: TC001
 from src.user.manager import User, UserManager
+from src.util.tools import Mosaic
 
 from ..server import (
     BaseResponse,
@@ -80,9 +81,9 @@ async def set_user_config(
     user: current_user_depends, system_access: system_access_depends, req: UserConfigData
 ) -> BaseResponse[bool]:
     config = user.config.model_copy(deep=True)
-    if BDUSS_MOSAIC in req.forum.bduss:
+    if Mosaic.has_mosaic(req.forum.bduss, min_length=COOKIE_MIN_MOSAIC_LENGTH):
         req.forum.bduss = user.config.forum.bduss
-    if STOKEN_MOSAIC in req.forum.stoken:
+    if Mosaic.has_mosaic(req.forum.stoken, min_length=COOKIE_MIN_MOSAIC_LENGTH):
         req.forum.stoken = user.config.forum.stoken
     config.forum = req.forum
     config.process = req.process

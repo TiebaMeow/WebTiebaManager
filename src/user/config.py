@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 
-from src.constance import BDUSS_MOSAIC, CONFIRM_EXPIRE, CONTENT_VALID_EXPIRE, STOKEN_MOSAIC
+from src.constance import CONFIRM_EXPIRE, CONTENT_VALID_EXPIRE, COOKIE_MIN_MOSAIC_LENGTH
 from src.rule.rule_set import RuleSetConfig
-from src.util.tools import int_time
+from src.util.tools import Mosaic, int_time
 
 
 class UserInfo(BaseModel):
@@ -41,10 +41,8 @@ class ForumConfig(BaseModel):
     @property
     def mosaic(self):
         config = self.model_copy()
-        if len(config.bduss) > 10:
-            config.bduss = config.bduss[:6] + BDUSS_MOSAIC + config.bduss[-4:]
-        if len(config.stoken) > 10:
-            config.stoken = config.stoken[:6] + STOKEN_MOSAIC + config.stoken[-4:]
+        config.bduss = Mosaic.compress(config.bduss, 6, 4, min_length=COOKIE_MIN_MOSAIC_LENGTH, ratio=8)
+        config.stoken = Mosaic.compress(config.stoken, 6, 4, min_length=COOKIE_MIN_MOSAIC_LENGTH, ratio=8)
         return config
 
 
