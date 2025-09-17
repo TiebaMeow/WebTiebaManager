@@ -3,7 +3,9 @@ from __future__ import annotations
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+from src.config import SystemConfig  # noqa: TC001
 from src.constance import BASE_DIR, CODE_EXPIRE
+from src.control import Controller
 from src.server import BaseResponse, app, ensure_system_access_depends, ip_depends
 from src.user.config import (
     ForumConfig,
@@ -147,3 +149,28 @@ async def register_user(req: RegisterRequest, ip: ip_depends) -> BaseResponse[bo
 
     system_logger.info(f"用户 {req.username} 注册成功 IP: {ip}")
     return BaseResponse(data=True, message="注册成功，请使用用户名和密码登录")
+
+
+@app.get("/api/system/get_config", tags=["system"])
+async def get_config(system_access: ensure_system_access_depends) -> BaseResponse[SystemConfig]:
+    return BaseResponse(data=Controller.config.mosaic)
+
+
+@app.post("/api/system/set_config", tags=["system"])
+async def set_config(system_access: ensure_system_access_depends, req: SystemConfig) -> BaseResponse[bool]:
+    try:
+        new_config = Controller.config.apply_new(req)
+        server_update = new_config.server != Controller.config.server
+        await Controller.update_config(new_config)
+    except PermissionError as e:
+        return BaseResponse(data=False, message=str(e), code=403)
+    except ValueError as e:
+        return BaseResponse(data=False, message=str(e), code=400)
+    except Exception as e:
+        return BaseResponse(data=False, message=str(e), code=500)
+
+    if server_update:
+        system_logger.info("检测到服务器配置变更，请重启程序以应用更改")
+        return BaseResponse(data=True, message="保存成功，请重启程序以应用更改")
+    else:
+        return BaseResponse(data=True, message="保存成功")

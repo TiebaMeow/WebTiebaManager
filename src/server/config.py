@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from src.util.tools import int_time, random_secret
+from src.util.tools import Mosaic, int_time, random_secret
 
 
 class ServerConfig(BaseModel, extra="ignore"):
@@ -29,3 +29,37 @@ class ServerConfig(BaseModel, extra="ignore"):
             "log_level": self.log_level,
             "access_log": self.access_log,
         }
+
+    @property
+    def mosaic(self):
+        config = self.model_copy()
+        config.key = Mosaic.full(config.key)
+        config.secret_key = Mosaic.compress(config.secret_key, 2, 0, ratio=8)
+        config.encryption_salt = Mosaic.compress(config.encryption_salt, 2, 0, ratio=8)
+        return config
+
+    def apply_new(self, new_config: "ServerConfig"):
+        new_config = new_config.model_copy(deep=True)
+        mosaic_config = self.mosaic
+
+        # 禁止覆盖 key_last_update
+        new_config.key_last_update = self.key_last_update
+
+        if new_config.key != self.key:
+            if new_config.key == mosaic_config.key:
+                new_config.key = self.key
+            else:
+                new_config.key_last_update = int_time()
+
+        if new_config.token_expire_days != self.token_expire_days:
+            self.secret_key = random_secret()
+
+        if new_config.secret_key != self.secret_key:
+            if new_config.secret_key == mosaic_config.secret_key:
+                new_config.secret_key = self.secret_key
+
+        if new_config.encryption_salt != self.encryption_salt:
+            if new_config.encryption_salt == mosaic_config.encryption_salt:
+                new_config.encryption_salt = self.encryption_salt
+
+        return new_config
