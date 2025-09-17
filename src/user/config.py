@@ -41,8 +41,8 @@ class ForumConfig(BaseModel):
     @property
     def mosaic(self):
         config = self.model_copy()
-        config.bduss = Mosaic.compress(config.bduss, 6, 4, min_length=COOKIE_MIN_MOSAIC_LENGTH, ratio=8)
-        config.stoken = Mosaic.compress(config.stoken, 6, 4, min_length=COOKIE_MIN_MOSAIC_LENGTH, ratio=8)
+        config.bduss = Mosaic.compress(config.bduss, 4, 2, min_length=COOKIE_MIN_MOSAIC_LENGTH, ratio=8)
+        config.stoken = Mosaic.compress(config.stoken, 4, 2, min_length=COOKIE_MIN_MOSAIC_LENGTH, ratio=4)
         return config
 
 
