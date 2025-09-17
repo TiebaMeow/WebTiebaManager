@@ -5,7 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from src.constance import COOKIE_MIN_MOSAIC_LENGTH
 from src.rule.rule import RuleInfo, Rules
 
 # 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
@@ -13,7 +12,7 @@ from src.rule.rule_set import RuleSetConfig  # noqa: TC001
 from src.user.config import ForumConfig, ProcessConfig, UserPermission  # noqa: TC001
 from src.user.confirm import ConfirmSimpleData  # noqa: TC001
 from src.user.manager import User, UserManager
-from src.util.tools import Mosaic
+from src.user.user import TiebaClientStatus
 
 from ..server import (
     BaseResponse,
@@ -24,10 +23,12 @@ from ..server import (
 
 
 class GetHomeInfoAccount(BaseModel):
-    is_vip: bool
-    portrait: str
-    user_name: str
-    nick_name: str
+    is_vip: bool = False
+    portrait: str = ""
+    user_name: str = ""
+    nick_name: str = ""
+    status: TiebaClientStatus
+    failed_reason: str = ""
 
 
 class GetHomeInfoData(BaseModel):
@@ -39,18 +40,28 @@ class GetHomeInfoData(BaseModel):
 
 @app.get("/api/user/info", tags=["user"])
 async def get_home_info(user: current_user_depends) -> BaseResponse[GetHomeInfoData]:
+    if user.client.status == TiebaClientStatus.MISSING_COOKIE:
+        account = GetHomeInfoAccount(status=TiebaClientStatus.MISSING_COOKIE)
+    elif user.client.status == TiebaClientStatus.FAILED:
+        account = GetHomeInfoAccount(
+            status=TiebaClientStatus.FAILED, failed_reason=user.client.failed_reason or "未知错误"
+        )
+    elif user.client.status == TiebaClientStatus.SUCCESS and user.client.info:
+        account = GetHomeInfoAccount(
+            status=TiebaClientStatus.SUCCESS,
+            user_name=user.client.info.user_name,
+            nick_name=user.client.info.nick_name,
+            portrait=user.client.info.portrait,
+            is_vip=user.client.info.is_vip,
+        )
+    else:
+        account = None
+
     return BaseResponse(
         data=GetHomeInfoData(
             enable=user.enable,
             forum=user.fname,
-            account=GetHomeInfoAccount(
-                user_name=user.client.info.user_name,
-                nick_name=user.client.info.nick_name,
-                portrait=user.client.info.portrait,
-                is_vip=user.client.info.is_vip,
-            )
-            if user.client.info
-            else None,
+            account=account,
             permission=user.perm,
         ),
     )
@@ -142,14 +153,14 @@ async def confirm_many(user: User, pids: list[int], action: Literal["ignore", "e
 
 @app.post("/api/confirm/confirm", tags=["confirm"])
 async def confirm_operation(user: current_user_depends, request: ConfirmRequest) -> BaseResponse[bool]:
-    if request.action == "execute" and not user.client.info:
-        return BaseResponse(data=False, message="账号未登录，不能执行确认操作", code=400)
-
     if isinstance(request.pid, int):
         if not (confirm := await user.confirm.get(request.pid)):
             return BaseResponse(data=False, message="内容不存在", code=400)
+        try:
+            await user.operate_confirm(confirm, request.action)
+        except ValueError:
+            return BaseResponse(data=False, message="账号未登录，无法执行需要吧务权限的操作", code=400)
 
-        await user.operate_confirm(confirm, request.action)
         return BaseResponse(data=True, message="操作成功")
     else:
         asyncio.create_task(confirm_many(user, request.pid, request.action))
