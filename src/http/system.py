@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from src.config import SystemConfig  # noqa: TC001
 from src.constance import BASE_DIR, CODE_EXPIRE
 from src.control import Controller
+from src.db.config import DatabaseConfig  # noqa: TC001
+from src.db.interface import Database
 from src.server import BaseResponse, app, ensure_system_access_depends, ip_depends
 from src.user.config import (
     ForumConfig,
@@ -174,3 +176,13 @@ async def set_config(system_access: ensure_system_access_depends, req: SystemCon
         return BaseResponse(data=True, message="保存成功，请重启程序以应用更改")
     else:
         return BaseResponse(data=True, message="保存成功")
+
+
+@app.post("/api/system/test_db_connection", tags=["system"], description="测试数据库连接")
+async def test_db(req: DatabaseConfig, system_access: ensure_system_access_depends) -> BaseResponse[bool]:
+    config = Controller.config.database.apply_new(req)
+    success, err = await Database.test_connection(config)
+    if err:
+        return BaseResponse(data=False, message=f"数据库连接失败 {err}", code=400)
+
+    return BaseResponse(data=True, message="数据库连接成功")
