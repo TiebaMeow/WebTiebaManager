@@ -59,7 +59,7 @@ class ServerConfig(BaseModel, extra="ignore"):
                 new_config.key_last_update = int_time()
 
         if new_config.token_expire_days != self.token_expire_days:
-            self.secret_key = random_secret()
+            new_config.secret_key = random_secret()
 
         if new_config.secret_key != self.secret_key:
             if new_config.secret_key == mosaic_config.secret_key:
