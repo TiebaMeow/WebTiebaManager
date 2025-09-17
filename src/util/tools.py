@@ -1,4 +1,5 @@
 import asyncio
+import re
 import secrets
 import time
 
@@ -127,3 +128,8 @@ class Mosaic:
             char = Mosaic.CHAR
         target = char * min_length
         return target in text
+
+
+def validate_password(password: str, max_length: int = 32) -> bool:
+    pattern = r"^[a-zA-Z0-9\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$"
+    return len(password) <= max_length and bool(re.match(pattern, password))

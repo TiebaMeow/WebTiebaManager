@@ -1,14 +1,14 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from src.util.tools import Mosaic, int_time, random_secret
+from src.util.tools import Mosaic, int_time, random_secret, validate_password
 
 
 class ServerConfig(BaseModel, extra="ignore"):
     host: str = "0.0.0.0"
     port: int = 36799
-    key: str = Field(default_factory=random_secret)
+    key: str = Field(default_factory=lambda: random_secret(16))
     secret_key: str = Field(default_factory=random_secret)
     log_level: Literal["info", "warning", "error"] = "warning"
     access_log: bool = False
@@ -16,6 +16,13 @@ class ServerConfig(BaseModel, extra="ignore"):
     key_last_update: int = Field(default_factory=int_time)
     encryption_method: Literal["plain", "md5"] = "plain"
     encryption_salt: str = Field(default_factory=random_secret)
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, v):
+        if not validate_password(v):
+            raise ValueError("密钥格式不正确")
+        return v
 
     @property
     def url(self):

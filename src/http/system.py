@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from src.config import SystemConfig  # noqa: TC001
 from src.constance import BASE_DIR, CODE_EXPIRE
@@ -18,7 +18,7 @@ from src.user.config import (
 from src.user.manager import UserManager
 from src.util.cache import ClearCache, ExpireCache
 from src.util.logging import system_logger
-from src.util.tools import random_secret
+from src.util.tools import random_secret, validate_password
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")
@@ -28,10 +28,10 @@ async def clear_confirms(system_access: ensure_system_access_depends) -> BaseRes
 
 
 class UserInfodata(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=32)
     permission: UserPermission
     forum: str
-    code: str
+    code: str = Field(..., min_length=0, max_length=32)
     use: bool = False
 
 
@@ -71,8 +71,8 @@ async def set_user_info(system_access: ensure_system_access_depends, req: UserIn
 
 
 class DeleteRequest(BaseModel):
-    username: str = ""
-    code: str = ""
+    username: str = Field(..., min_length=0, max_length=32)
+    code: str = Field(..., min_length=0, max_length=32)
 
 
 @app.post("/api/system/delete_user", tags=["system"])
@@ -120,9 +120,16 @@ async def create_invite_code(system_access: ensure_system_access_depends, req: U
 
 
 class RegisterRequest(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=32)
     password: str
-    code: str
+    code: str = Field(..., min_length=1, max_length=32)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if not validate_password(v):
+            raise ValueError("密码长度至少8位，且包含大小写字母、数字和特殊字符")
+        return v
 
 
 @app.post("/api/register", tags=["register"])

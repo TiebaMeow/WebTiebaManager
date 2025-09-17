@@ -14,7 +14,7 @@ from fastapi import Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.control import Controller
 from src.user.manager import User, UserManager
@@ -49,7 +49,7 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=32)
     password_last_update: int
     key_last_update: int | None
 

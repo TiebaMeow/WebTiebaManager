@@ -1,20 +1,28 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.config import ServerConfig, SystemConfig
 from src.control import Controller
 from src.user.config import UserConfig, UserInfo
 from src.user.manager import UserManager
 from src.util.logging import system_logger
+from src.util.tools import validate_password
 
 from ..server import BaseResponse, Server, app
 
 
 class UserRequest(BaseModel):
     username: str = Field(min_length=1, max_length=32)
-    password: str = Field(min_length=1, max_length=32)
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_field(cls, v):
+        if not validate_password(v):
+            raise ValueError("密码格式不正确")
+        return v
 
 
 class SystemRequest(BaseModel):
@@ -22,6 +30,13 @@ class SystemRequest(BaseModel):
     port: int = 36800
     key: str
     token_expire_days: int = 7
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, v):
+        if not validate_password(v):
+            raise ValueError("密钥格式不正确")
+        return v
 
 
 class InitializeRequest(BaseModel):

@@ -1,15 +1,22 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.constance import CONFIRM_EXPIRE, CONTENT_VALID_EXPIRE, COOKIE_MIN_MOSAIC_LENGTH
 from src.rule.rule_set import RuleSetConfig
-from src.util.tools import Mosaic, int_time
+from src.util.tools import Mosaic, int_time, validate_password
 
 
 class UserInfo(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=32)
     password: str
     code: str = ""
     password_last_update: int = Field(default_factory=int_time)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_field(cls, v):
+        if not validate_password(v):
+            raise ValueError("密码格式不正确")
+        return v
 
 
 class UserPermission(BaseModel):
