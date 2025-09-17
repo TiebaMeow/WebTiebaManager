@@ -81,10 +81,13 @@ async def set_user_config(
     user: current_user_depends, system_access: system_access_depends, req: UserConfigData
 ) -> BaseResponse[bool]:
     config = user.config.model_copy(deep=True)
-    if Mosaic.has_mosaic(req.forum.bduss, min_length=COOKIE_MIN_MOSAIC_LENGTH):
+
+    mosaic_forum = user.config.forum.mosaic
+    if req.forum.bduss == mosaic_forum.bduss:
         req.forum.bduss = user.config.forum.bduss
-    if Mosaic.has_mosaic(req.forum.stoken, min_length=COOKIE_MIN_MOSAIC_LENGTH):
+    if req.forum.stoken == mosaic_forum.stoken:
         req.forum.stoken = user.config.forum.stoken
+
     config.forum = req.forum
     config.process = req.process
     try:
