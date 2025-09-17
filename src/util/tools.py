@@ -131,5 +131,14 @@ class Mosaic:
 
 
 def validate_password(password: str, max_length: int = 32) -> bool:
+    """
+    根据如下规则验证密码有效性
+    - 允许的字符：大小写英文字母（A-Z, a-z）、数字（0-9）、以及以下 ASCII 符号：\n
+      !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+    - 最大长度：密码长度不得超过 `max_length` 个字符（默认值：32）
+
+    Returns:
+        如果密码符合这些要求，返回 True，否则返回 False。
+    """
     pattern = r"^[a-zA-Z0-9\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$"
     return len(password) <= max_length and bool(re.match(pattern, password))
