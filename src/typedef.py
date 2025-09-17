@@ -206,3 +206,8 @@ class Comment(BaseContent, ContentInterface):
 
 
 Content = Thread | Post | Comment
+
+
+class UpdateEventData[T](BaseModel):
+    old: T
+    new: T

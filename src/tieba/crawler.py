@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 import aiotieba
@@ -17,6 +18,10 @@ from src.util.logging import exception_logger, system_logger
 from src.util.tools import EtaSleep, Timer
 
 from .browser import TiebaBrowser
+
+if TYPE_CHECKING:
+    from src.config import SystemConfig
+    from src.typedef import UpdateEventData
 
 
 @ClearCache.on
@@ -86,13 +91,14 @@ class Spider:
         pass
 
     def __init__(self):
-        self.update_config(None)
         Controller.SystemConfigChange.on(self.update_config)
         self.client = None  # type: ignore
         self.browser = None  # type: ignore
-
-    def update_config(self, _: None):
         self.eta = EtaSleep(Controller.config.scan.query_cd)
+
+    def update_config(self, data: UpdateEventData[SystemConfig]):
+        if data.old.scan.query_cd != data.new.scan.query_cd:
+            self.eta = EtaSleep(Controller.config.scan.query_cd)
 
     async def init_client(self):
         if self.client is None:
@@ -245,8 +251,8 @@ class Crawler:
             cls.task = None
 
     @classmethod
-    async def restart(cls, _: None = None):
-        if cls.task:
+    async def restart(cls, data: UpdateEventData[SystemConfig]):
+        if cls.task and data.old.scan != data.new.scan:
             cls.task.cancel()
             cls.task = asyncio.create_task(cls.crawl())
 
