@@ -4,6 +4,8 @@ from urllib.parse import quote_plus
 
 from pydantic import BaseModel, computed_field
 
+from src.util.tools import Mosaic
+
 
 class DatabaseConfig(BaseModel, extra="ignore"):
     type: Literal["sqlite", "postgresql"]
@@ -32,3 +34,20 @@ class DatabaseConfig(BaseModel, extra="ignore"):
             )
         else:
             raise ValueError("Unsupported database type")
+
+    @property
+    def mosaic(self):
+        config = self.model_copy()
+        if config.password:
+            config.password = Mosaic.full(config.password)
+        return config
+
+    def apply_new(self, new_config: "DatabaseConfig"):
+        new_config = new_config.model_copy(deep=True)
+        mosaic_config = self.mosaic
+
+        if new_config.password != self.password:
+            if new_config.password == mosaic_config.password:
+                new_config.password = self.password
+
+        return new_config

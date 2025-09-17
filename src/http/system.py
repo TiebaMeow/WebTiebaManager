@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
+from src.config import SystemConfig  # noqa: TC001
 from src.constance import BASE_DIR, CODE_EXPIRE
+from src.control import Controller
+from src.db.config import DatabaseConfig  # noqa: TC001
+from src.db.interface import Database
 from src.server import BaseResponse, app, ensure_system_access_depends, ip_depends
 from src.user.config import (
     ForumConfig,
@@ -14,7 +18,7 @@ from src.user.config import (
 from src.user.manager import UserManager
 from src.util.cache import ClearCache, ExpireCache
 from src.util.logging import system_logger
-from src.util.tools import random_secret
+from src.util.tools import random_secret, validate_password
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")
@@ -24,10 +28,10 @@ async def clear_confirms(system_access: ensure_system_access_depends) -> BaseRes
 
 
 class UserInfodata(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=32)
     permission: UserPermission
     forum: str
-    code: str
+    code: str = Field(..., min_length=0, max_length=32)
     use: bool = False
 
 
@@ -67,8 +71,8 @@ async def set_user_info(system_access: ensure_system_access_depends, req: UserIn
 
 
 class DeleteRequest(BaseModel):
-    username: str = ""
-    code: str = ""
+    username: str = Field(..., min_length=0, max_length=32)
+    code: str = Field(..., min_length=0, max_length=32)
 
 
 @app.post("/api/system/delete_user", tags=["system"])
@@ -116,9 +120,16 @@ async def create_invite_code(system_access: ensure_system_access_depends, req: U
 
 
 class RegisterRequest(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=32)
     password: str
-    code: str
+    code: str = Field(..., min_length=1, max_length=32)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if not validate_password(v):
+            raise ValueError("密码格式不正确")
+        return v
 
 
 @app.post("/api/register", tags=["register"])
@@ -147,3 +158,38 @@ async def register_user(req: RegisterRequest, ip: ip_depends) -> BaseResponse[bo
 
     system_logger.info(f"用户 {req.username} 注册成功 IP: {ip}")
     return BaseResponse(data=True, message="注册成功，请使用用户名和密码登录")
+
+
+@app.get("/api/system/get_config", tags=["system"])
+async def get_config(system_access: ensure_system_access_depends) -> BaseResponse[SystemConfig]:
+    return BaseResponse(data=Controller.config.mosaic)
+
+
+@app.post("/api/system/set_config", tags=["system"])
+async def set_config(system_access: ensure_system_access_depends, req: SystemConfig) -> BaseResponse[bool]:
+    try:
+        new_config = Controller.config.apply_new(req)
+        server_update = new_config.server != Controller.config.server
+        await Controller.update_config(new_config)
+    except PermissionError as e:
+        return BaseResponse(data=False, message=str(e), code=403)
+    except ValueError as e:
+        return BaseResponse(data=False, message=str(e), code=400)
+    except Exception as e:
+        return BaseResponse(data=False, message=str(e), code=500)
+
+    if server_update:
+        system_logger.info("检测到服务器配置变更，请重启程序以应用更改")
+        return BaseResponse(data=True, message="保存成功，请重启程序以应用更改")
+    else:
+        return BaseResponse(data=True, message="保存成功")
+
+
+@app.post("/api/system/test_db_connection", tags=["system"], description="测试数据库连接")
+async def test_db(req: DatabaseConfig, system_access: ensure_system_access_depends) -> BaseResponse[bool]:
+    config = Controller.config.database.apply_new(req)
+    success, err = await Database.test_connection(config)
+    if err:
+        return BaseResponse(data=False, message=f"数据库连接失败 {err}", code=400)
+
+    return BaseResponse(data=True, message="数据库连接成功")

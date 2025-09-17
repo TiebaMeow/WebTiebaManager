@@ -14,6 +14,7 @@ class OperationTemplate(BaseModel):
     type: Any
     options: Any = None
     direct: bool = False
+    _need_bawu: bool
 
     def serialize(self) -> dict[str, Any]:
         data = {"type": self.type}  # type: ignore
@@ -65,6 +66,13 @@ class OperationGroup:
     def deserialize(data: OPERATION_TYPE | dict[str, Any]):
         return Operations.deserialize(data)
 
+    @property
+    def need_bawu(self) -> bool:
+        if isinstance(self.operations, str):
+            return self.operations in ("delete", "delete_and_block", "block")
+        else:
+            return any(i._need_bawu for i in self.operations)
+
 
 class Operations:
     operation_classes = None
@@ -95,6 +103,7 @@ class DeleteOptions(BaseModel):
 class Delete(OperationTemplate):
     type: Literal["delete"] = "delete"
     options: DeleteOptions = Field(default_factory=DeleteOptions)
+    _need_bawu: bool = True
 
     async def store_data(self, obj: ProcessObject, data: dict[str, Any]) -> None:
         if data.get("is_thread_author") is None:
@@ -108,5 +117,6 @@ class BlockOptions(BaseModel):
 
 @Operations.register
 class Block(OperationTemplate):
+    _need_bawu: bool = True
     type: Literal["block"] = "block"
     options: BlockOptions = Field(default_factory=BlockOptions)

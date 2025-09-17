@@ -19,6 +19,19 @@ class SystemConfig(BaseModel, extra="ignore"):
     )
     cleanup_time: str = "04:00"  # 缓存清理时间，格式如 "HH:MM"
 
+    @property
+    def mosaic(self):
+        config = self.model_copy(deep=True)
+        config.server = config.server.mosaic
+        config.database = config.database.mosaic
+        return config
+
+    def apply_new(self, new_config: "SystemConfig"):
+        new_config = new_config.model_copy(deep=True)
+        new_config.server = self.server.apply_new(new_config.server)
+        new_config.database = self.database.apply_new(new_config.database)
+        return new_config
+
 
 def read_config[T](path: Path, obj: type[T]) -> T:
     if path.exists():
@@ -28,12 +41,7 @@ def read_config[T](path: Path, obj: type[T]) -> T:
         return obj.model_validate({})  # type: ignore
 
 
-CONFIG_PATH = BASE_DIR / "config.toml"
-
-system_config = read_config(CONFIG_PATH, SystemConfig)
-
-
-def write_config(config, path: Path = CONFIG_PATH):
+def write_config(config, path: Path):
     with Path(path).open(mode="w", encoding="utf8") as f:
         if path.suffix == ".toml":
             tomlkit.dump(config.model_dump(exclude_none=True), f)

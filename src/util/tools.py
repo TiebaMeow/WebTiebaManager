@@ -1,4 +1,5 @@
 import asyncio
+import re
 import secrets
 import time
 
@@ -77,3 +78,67 @@ class Timer:
 
 def random_secret(length=32):
     return secrets.token_hex(length)
+
+
+class Mosaic:
+    CHAR = "*"
+
+    @staticmethod
+    def mosaic(text: str, start: int = 1, end: int = 1, char: str | None = None) -> str:
+        if not text:
+            return ""
+        start = max(0, start)
+        end = max(0, end)
+        if char is None:
+            char = Mosaic.CHAR
+        if len(text) <= start + end:
+            return char * len(text)
+        return text[:start] + char * (len(text) - start - end) + text[-end:]
+
+    @staticmethod
+    def full(text: str, char: str | None = None) -> str:
+        if not text:
+            return ""
+        if char is None:
+            char = Mosaic.CHAR
+        return char * len(text)
+
+    @staticmethod
+    def compress(
+        text: str, start: int = 1, end: int = 1, char: str | None = None, ratio: int = 2, min_length: int = 1
+    ) -> str:
+        if not text:
+            return ""
+        start = max(0, start)
+        end = max(0, end)
+        ratio = max(1, ratio)
+        min_length = max(1, min_length)
+        if char is None:
+            char = Mosaic.CHAR
+        if len(text) <= start + end + 2:
+            return char * len(text)
+        mosaic_len = max((len(text) - start - end) // ratio, min_length)
+        return text[:start] + char * mosaic_len + text[-end:]
+
+    @staticmethod
+    def has_mosaic(text: str, char: str | None = None, min_length: int = 1) -> bool:
+        if not text or min_length <= 0:
+            return False
+        if char is None:
+            char = Mosaic.CHAR
+        target = char * min_length
+        return target in text
+
+
+def validate_password(password: str, max_length: int = 32) -> bool:
+    """
+    根据如下规则验证密码有效性
+    - 允许的字符：大小写英文字母（A-Z, a-z）、数字（0-9）、以及以下 ASCII 符号：\n
+      !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+    - 最大长度：密码长度不得超过 `max_length` 个字符（默认值：32）
+
+    Returns:
+        如果密码符合这些要求，返回 True，否则返回 False。
+    """
+    pattern = r"^[a-zA-Z0-9\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$"
+    return len(password) <= max_length and bool(re.match(pattern, password))

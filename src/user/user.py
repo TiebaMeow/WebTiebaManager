@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
 import aiotieba
@@ -27,66 +28,74 @@ if TYPE_CHECKING:
     from .config import UserConfig
 
 
-class TiebaClientEmpty:
-    class InvalidClientError(Exception):
-        pass
-
-    bduss = ""
-    stoken = ""
-    client = None  # type: ignore
-    info = None  # type: ignore
-
-    def __init__(self, logger: Logger) -> None:
-        self.logger = logger
-
-    async def delete(self, content: Content):
-        raise self.InvalidClientError("无效的客户端")
-
-    async def block(self, content: Content, day: int = 1, reason: str = ""):
-        raise self.InvalidClientError("无效的客户端")
-
-    async def delete_thread(self, fname: str, tid: int):
-        raise self.InvalidClientError("无效的客户端")
-
-    async def delete_post(self, fname: str, tid: int, pid: int):
-        raise self.InvalidClientError("无效的客户端")
+class TiebaClientStatus(Enum):
+    MISSING_COOKIE = "MISSING_COOKIE"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
 
 
 class TiebaClient:
-    def __init__(self, bduss: str, stoken: str, logger: Logger) -> None:
+    def __init__(self, logger: Logger, /, bduss: str = "", stoken: str = "") -> None:
         self.bduss = bduss
         self.stoken = stoken
-        self.client: aiotieba.Client = None  # type: ignore
-        self.info: aiotieba.typing.UserInfo = None  # type: ignore
+        self._client: aiotieba.Client | None = None
+        self.info: aiotieba.typing.UserInfo | None = None
         self.logger = logger
+        self.status: TiebaClientStatus = TiebaClientStatus.MISSING_COOKIE
+        self.failed_reason = ""
+
+    class InvalidClientError(Exception):
+        pass
 
     @classmethod
-    async def create(cls, bduss: str, stoken: str, logger: Logger):
-        client = cls(bduss, stoken, logger)
-        try:
-            if not await client.start():
-                logger.warning("登录失败，请检查 BDUSS 和 STOKEN 是否正确")
-                return TiebaClientEmpty(logger)
-        except ValueError:
-            logger.warning("登录失败，请检查 BDUSS 和 STOKEN 是否正确")
-            return TiebaClientEmpty(logger)
-
+    async def create(cls, logger: Logger, /, bduss: str = "", stoken: str = ""):
+        client = cls(logger, bduss=bduss, stoken=stoken)
+        await client.start()
         return client
 
     async def start(self) -> bool:
-        self.client = aiotieba.Client(BDUSS=self.bduss, STOKEN=self.stoken)
-        await self.client.__aenter__()
-        self.info = await self.client.get_self_info()
+        if not self.bduss or not self.stoken:
+            self.logger.warning("未提供 BDUSS 或 STOKEN，无法登录贴吧，吧务操作将不可用")
+            self.status = TiebaClientStatus.MISSING_COOKIE
+            return False
+
+        try:
+            self._client = aiotieba.Client(BDUSS=self.bduss, STOKEN=self.stoken)
+        except ValueError as e:
+            self.logger.error(f"贴吧客户端初始化失败，原因：{e}")
+            self.failed_reason = str(e)
+            self.status = TiebaClientStatus.FAILED
+            self._client = None
+            return False
+
+        try:
+            await self._client.__aenter__()
+            self.info = await self._client.get_self_info()
+        except Exception as e:
+            self.logger.exception(f"贴吧登录失败，原因：{e}")
+            self.failed_reason = str(e)
+            self.status = TiebaClientStatus.FAILED
+            return False
+
         if self.info.user_id == 0:
-            await self.stop()
+            self.status = TiebaClientStatus.FAILED
+            self.failed_reason = "贴吧个人信息获取失败，BDUSS 或 STOKEN 无效"
+            self.logger.error("贴吧登录失败，无法获取个人信息，BDUSS 或 STOKEN 无效")
             return False
 
         self.logger.info(f"贴吧登录成功 用户名：{self.info.user_name}")
+        self.status = TiebaClientStatus.SUCCESS
         return True
 
     async def stop(self):
-        if self.client:
-            await self.client.__aexit__()
+        if self._client:
+            await self._client.__aexit__()
+
+    @property
+    def client(self) -> aiotieba.Client:
+        if self._client is None:
+            raise self.InvalidClientError("客户端未初始化")
+        return self._client
 
     async def _delete_thread(self, fname: str, tid: int):
         return await self.client.del_thread(fname, tid=tid)
@@ -96,10 +105,14 @@ class TiebaClient:
 
     async def delete(self, content: Content):
         self.logger.info(f"正在删除 {content.mark}", tid=content.tid, pid=content.pid)
-        if content.type == "thread":
-            result = await self._delete_thread(content.fname, tid=content.tid)
-        else:
-            result = await self._delete_post(content.fname, tid=content.tid, pid=content.pid)
+        try:
+            if content.type == "thread":
+                result = await self._delete_thread(content.fname, tid=content.tid)
+            else:
+                result = await self._delete_post(content.fname, tid=content.tid, pid=content.pid)
+        except TiebaClient.InvalidClientError:
+            self.logger.warning("无法删除，未登录")
+            return False
 
         if not result:
             self.logger.warning(f"删除失败 {content.mark} {result.err}", tid=content.tid, pid=content.pid)
@@ -109,7 +122,12 @@ class TiebaClient:
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
         self.logger.info(f"正在封禁 {content.user.log_name}", uid=content.user.user_id)
-        result = await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
+        try:
+            result = await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
+        except TiebaClient.InvalidClientError:
+            self.logger.warning("无法封禁，未登录")
+            return False
+
         if not result:
             self.logger.warning(f"封禁失败 {content.user.log_name} {result.err}", uid=content.user.user_id)
             return False
@@ -133,7 +151,7 @@ class User:
         self.processer = Processer(config)
         self.confirm = ConfirmCache(self.dir, expire_time=self.config.process.confirm_expire)
         self.logger = logger.bind(name=f"user.{self.config.user.username}")
-        self.client: TiebaClient | TiebaClientEmpty = TiebaClientEmpty(self.logger)
+        self.client: TiebaClient = TiebaClient(self.logger)
         self.valid = False
 
     @property
@@ -167,8 +185,7 @@ class User:
             [i.un_register() for i in self.listeners]
             self.listeners.clear()
 
-            if isinstance(self.client, TiebaClient):
-                await self.client.stop()
+            await self.client.stop()
 
             await self.confirm.stop()
             LogRecorder.remove(f"user.{self.username}")
@@ -203,9 +220,13 @@ class User:
                 or new_config.forum.stoken != old_config.forum.stoken
                 or initialize
             ):
-                self.client = await TiebaClient.create(new_config.forum.bduss, new_config.forum.stoken, self.logger)
-        else:
-            self.client = TiebaClientEmpty(self.logger)
+                await self.client.stop()
+                self.client = await TiebaClient.create(
+                    self.logger, bduss=new_config.forum.bduss, stoken=new_config.forum.stoken
+                )
+        elif self.client.status != TiebaClientStatus.MISSING_COOKIE:
+            await self.client.stop()
+            self.client = await TiebaClient.create(self.logger)
 
         if old_config.process.confirm_expire != new_config.process.confirm_expire:
             await self.confirm.set_expire_time(new_config.process.confirm_expire)
@@ -275,11 +296,7 @@ class User:
         """
         if self.config.process.mandatory_confirm or rule_set.manual_confirm:
             if og := rule_set.operations.direct_operations:
-                try:
-                    await self.operate(obj, og)
-                except TiebaClientEmpty.InvalidClientError:
-                    self.logger.warning("操作失败，未登录")
-                    return
+                await self.operate(obj, og)
 
             og = rule_set.operations.no_direct_operations
 
@@ -305,10 +322,7 @@ class User:
                 self.logger.info(f"{obj.content.mark} 需要确认后才能继续操作", tid=obj.content.tid, pid=obj.content.pid)
 
         else:
-            try:
-                await self.operate(obj, rule_set.operations)
-            except TiebaClientEmpty.InvalidClientError:
-                self.logger.warning("操作失败，未登录")
+            await self.operate(obj, rule_set.operations)
 
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         if isinstance(confirm, (str, int)):
@@ -328,6 +342,13 @@ class User:
             elif action == "execute":
                 obj = ProcessObject(confirm.content, confirm.data)
                 og = OperationGroup.deserialize(confirm.operations)  # type: ignore
+
+                if og.need_bawu and self.client.status != TiebaClientStatus.SUCCESS:
+                    self.logger.warning(
+                        f"执行 {confirm.content.mark} 的确认需要吧务权限，但账号未登录，无法执行确认操作"
+                    )
+                    raise ValueError("无效的账号状态")
+
                 self.logger.info(
                     f"执行 {confirm.content.mark} 的确认", tid=confirm.content.tid, pid=confirm.content.pid
                 )

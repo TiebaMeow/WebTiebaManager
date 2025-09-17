@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from datetime import datetime
 
+    from src.config import SystemConfig
+    from src.typedef import UpdateEventData
+
 MixedContentType = aiotieba.Thread | Post | Comment
 
 
@@ -95,6 +98,41 @@ class Database:
                 raise
             finally:
                 await session.close()
+
+    @classmethod
+    async def update_config(cls, data: UpdateEventData[SystemConfig]):
+        old_db = DatabaseConfig.model_validate(data.old.database)
+        new_db = DatabaseConfig.model_validate(data.new.database)
+        if old_db != new_db:
+            system_logger.info("数据库配置已更改，正在重新连接数据库...")
+            await cls.teardown()
+            await cls.startup()
+
+    @classmethod
+    async def test_connection(cls, config: DatabaseConfig) -> tuple[bool, Exception | None]:
+        """
+        测试数据库连接。
+        返回 (True, None) 表示连接成功，(False, 异常对象) 表示连接失败。
+        """
+        import asyncio
+
+        config = DatabaseConfig.model_validate(config)
+        test_engine = create_async_engine(
+            config.database_url,
+            pool_pre_ping=(config.type != "sqlite"),
+        )
+
+        async def _test():
+            async with test_engine.connect() as conn:
+                await conn.execute(select(1))
+
+        try:
+            await asyncio.wait_for(_test(), timeout=30)
+            return True, None
+        except TimeoutError:
+            return False, TimeoutError("数据库连接测试超时（30秒）")
+        except Exception as e:
+            return False, e
 
     @classmethod
     async def save_items[T: (ContentModel, ForumModel, LifeModel, UserModel)](
@@ -248,3 +286,4 @@ class Database:
 
 Controller.Start.on(Database.startup)
 Controller.Stop.on(Database.teardown)
+Controller.SystemConfigChange.on(Database.update_config)

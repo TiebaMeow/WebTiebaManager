@@ -1,17 +1,18 @@
 from src.util.logging import system_logger
 
-from .config import SystemConfig, system_config, write_config
-from .typedef import Content
+from .config import SystemConfig, read_config, write_config
+from .constance import SYSTEM_CONFIG_PATH
+from .typedef import Content, UpdateEventData
 from .util.event import AsyncEvent
 
 
 class Controller:
     Start = AsyncEvent[None]()
     Stop = AsyncEvent[None]()
-    SystemConfigChange = AsyncEvent[None]()
+    SystemConfigChange = AsyncEvent[UpdateEventData[SystemConfig]]()
     DispatchContent = AsyncEvent[Content]()
 
-    config: SystemConfig
+    config: SystemConfig = read_config(SYSTEM_CONFIG_PATH, SystemConfig)
     running: bool = False
 
     @classmethod
@@ -37,10 +38,8 @@ class Controller:
         if cls.config == new_config:
             return
 
+        old_config = cls.config
         cls.config = new_config
-        write_config(new_config)
-        await cls.SystemConfigChange.broadcast(None)
+        write_config(new_config, SYSTEM_CONFIG_PATH)
+        await cls.SystemConfigChange.broadcast(UpdateEventData(old=old_config, new=new_config))
         system_logger.info("系统配置已更改")
-
-
-Controller.config = system_config
