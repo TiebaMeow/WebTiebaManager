@@ -28,7 +28,7 @@ async def clear_confirms(system_access: ensure_system_access_depends) -> BaseRes
 
 
 class UserInfodata(BaseModel):
-    username: str = Field(..., min_length=1, max_length=32)
+    username: str = Field(min_length=0, max_length=32, default="")
     permission: UserPermission
     forum: str
     code: str = Field(..., min_length=0, max_length=32)
