@@ -58,7 +58,7 @@ async def get_initialize_info() -> BaseResponse[GetInitializeInfoData]:
 
 @app.post("/api/initialize/initialize", tags=["initialize"])
 async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
-    if not await Server.need_initialize():
+    if not Server.need_initialize:
         raise HTTPException(status_code=400, detail="系统已经初始化")
 
     if await Server.need_user():

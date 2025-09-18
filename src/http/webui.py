@@ -47,7 +47,7 @@ Controller.Stop.on(Proxy.stop)
 @app.get("/", tags=["webui"])
 async def index(request: Request):
     content, status_code, headers = await Proxy.get(f"{WEBUI_BASE}/index.html", request)
-    if await Server.need_initialize():
+    if Server.need_initialize:
         content = content.replace(b"</head>", b'<script>location.href="/#/initialize"</script></head>')
         headers["Content-Length"] = str(len(content))
         headers["Cache-Control"] = "no-store"
@@ -67,4 +67,4 @@ class ServerInfo(BaseModel):
 
 @app.get("/api/info", tags=["webui"])
 async def webui_info() -> ServerInfo:
-    return ServerInfo(version=PROGRAM_VERSION, need_initialize=await Server.need_initialize())
+    return ServerInfo(version=PROGRAM_VERSION, need_initialize=Server.need_initialize)
