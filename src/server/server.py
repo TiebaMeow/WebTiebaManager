@@ -11,6 +11,7 @@ from src.control import Controller
 from src.tieba import crawler
 from src.user.manager import UserManager
 from src.util.logging import exception_logger, system_logger
+from src.util.tools import random_str
 
 from .config import ServerConfig
 
@@ -28,8 +29,12 @@ def initialize_server_config():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await Controller.start()
+    if Server.need_initialize():
+        system_logger.warning(f"初始化密钥: {Server.secure_key()}")
+
     yield
     await Controller.stop()
+    Server._secure_key = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -65,6 +70,13 @@ class BaseResponse[T](BaseModel):
 class Server:
     need_restart: bool = False
     server: uvicorn.Server | None = None
+    _secure_key: str | None = None
+
+    @classmethod
+    def secure_key(cls):
+        if cls._secure_key is None:
+            cls._secure_key = random_str(8)
+        return cls._secure_key
 
     @classmethod
     def need_system(cls):

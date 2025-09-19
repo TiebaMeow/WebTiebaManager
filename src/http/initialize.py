@@ -42,6 +42,7 @@ class SystemRequest(BaseModel):
 class InitializeRequest(BaseModel):
     user: UserRequest | None = None
     system: SystemRequest | None = None
+    secure_key: str
 
 
 class GetInitializeInfoData(BaseModel):
@@ -60,6 +61,9 @@ async def get_initialize_info() -> BaseResponse[GetInitializeInfoData]:
 async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
     if not Server.need_initialize():
         raise HTTPException(status_code=400, detail="系统已经初始化")
+
+    if request.secure_key != Server.secure_key():
+        raise HTTPException(status_code=400, detail="初始化密钥错误")
 
     if Server.need_user():
         if not request.user:
