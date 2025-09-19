@@ -6,7 +6,7 @@ from src.util.tools import Mosaic, get_listenable_addresses, int_time, random_se
 
 
 class ServerConfig(BaseModel, extra="ignore"):
-    host: str = "0.0.0.0"
+    host: str = "localhost"
     port: int = 36799
     key: str = Field(default_factory=lambda: random_secret(16))
     secret_key: str = Field(default_factory=random_secret)
