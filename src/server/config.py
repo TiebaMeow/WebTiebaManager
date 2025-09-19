@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.util.tools import Mosaic, int_time, random_secret, validate_password
+from src.util.tools import Mosaic, get_listenable_addresses, int_time, random_secret, validate_password
 
 
 class ServerConfig(BaseModel, extra="ignore"):
@@ -27,6 +27,13 @@ class ServerConfig(BaseModel, extra="ignore"):
     @property
     def url(self):
         return f"http://{self.host}:{self.port}"
+
+    @property
+    def listenable_urls(self) -> list[str]:
+        if self.host == "0.0.0.0":
+            return [f"http://{addr}:{self.port}" for addr in get_listenable_addresses()]
+        else:
+            return [self.url]
 
     @property
     def uvicorn_config_param(self):

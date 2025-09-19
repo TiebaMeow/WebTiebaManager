@@ -74,6 +74,16 @@ class Server:
         cls.need_initialize = cls.need_system() or await cls.need_user()
 
     @classmethod
+    def console_prompt(cls, config: ServerConfig, log_fn=system_logger.info):
+        listenable_urls = config.listenable_urls
+        if len(listenable_urls) == 1:
+            log_fn(f"访问 {listenable_urls[0]} 进行管理")
+        else:
+            log_fn("访问以下地址进行管理:")
+            for url in listenable_urls:
+                log_fn(f"- {url}")
+
+    @classmethod
     async def serve(cls):
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
@@ -86,10 +96,10 @@ class Server:
             await cls.update_need_initialize()
             if cls.need_initialize:
                 system_logger.warning("系统未初始化，请先进行初始化")
-                system_logger.warning(f"访问 {config.url} 进行初始化")
+                cls.console_prompt(config, log_fn=system_logger.warning)
             else:
                 system_logger.info("正在启动服务")
-                system_logger.info(f"访问 {config.url} 进行管理")
+                cls.console_prompt(config)
 
             await server.serve()
 
@@ -114,7 +124,7 @@ class Server:
                 if DEV:
                     config = ServerConfig() if cls.need_system() else Controller.config.server
                     system_logger.warning("开发模式运行，请勿在生产环境使用")
-                    system_logger.warning(f"访问 {config.url} 进行管理")
+                    cls.console_prompt(config, log_fn=system_logger.warning)
                     cls.dev_run(config)
                 else:
                     import asyncio

@@ -1,6 +1,7 @@
 import asyncio
 import re
 import secrets
+import socket
 import time
 
 
@@ -130,11 +131,48 @@ class Mosaic:
         return target in text
 
 
+def get_listenable_addresses(with_default: bool = True, ipv6: bool = False) -> list[str]:
+    """
+    获取所有本机可监听的 IPv4 和 IPv6 地址（不含端口）。
+    包含 127.0.0.1、::1 及所有网卡地址。
+
+    Args:
+        with_default (bool): 是否包含默认的回环地址
+        ipv6 (bool): 是否包含 IPv6 地址
+    """
+    addresses = set()
+    # 获取主机名
+    hostname = socket.gethostname()
+    # 获取所有IPv4地址
+    try:
+        if with_default:
+            addresses.update(["127.0.0.1"])
+        ipv4_list = socket.gethostbyname_ex(hostname)[2]
+        for ip in ipv4_list:
+            if ip:
+                addresses.add(ip)
+    except Exception:
+        pass
+    # 获取所有IPv6地址
+    if ipv6:
+        if with_default:
+            addresses.update(["::1"])
+        try:
+            infos = socket.getaddrinfo(hostname, None, family=socket.AF_INET6)
+            for info in infos:
+                ip = info[4][0]
+                if ip:
+                    addresses.add(ip)
+        except Exception:
+            pass
+    return sorted(addresses)
+
+
 def validate_password(password: str, max_length: int = 32) -> bool:
     r"""
     根据如下规则验证密码有效性
     - 允许的字符：大小写英文字母（A-Z, a-z）、数字（0-9）、以及以下 ASCII 符号:
-    - !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+    - !\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
     - 最大长度：密码长度不得超过 `max_length` 个字符（默认值：32）
 
     Returns:
