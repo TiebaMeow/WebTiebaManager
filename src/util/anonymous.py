@@ -9,13 +9,12 @@ class AnonymousAiohttp:
     async def session(cls):
         if cls._session is None or cls._session.closed:
             cls._session = aiohttp.ClientSession()
-            await cls._session.__aenter__()
         return cls._session
 
     @classmethod
     async def stop(cls, _=None):
         if cls._session and not cls._session.closed:
-            await cls._session.__aexit__(None, None, None)
+            await cls._session.close()
             cls._session = None
 
 
