@@ -3,41 +3,15 @@ from __future__ import annotations
 import io
 from typing import TYPE_CHECKING, Literal
 
-import aiotieba
 import cv2
 from fastapi.responses import StreamingResponse
 
-from src.control import Controller
+from src.util.anonymous import AnonymousAiotieba
 
 from ..server import app
 
 if TYPE_CHECKING:
     import numpy as np
-
-
-class AnonymousClient:
-    client: aiotieba.Client | None = None
-
-    @classmethod
-    async def start(cls):
-        cls.client = aiotieba.Client()
-        await cls.client.__aenter__()
-        return cls.client
-
-    @classmethod
-    async def get_client(cls):
-        if not cls.client:
-            return await cls.start()
-        return cls.client
-
-    @classmethod
-    async def stop(cls, _=None):
-        if cls.client:
-            await cls.client.__aexit__()
-            cls.client = None
-
-
-Controller.Stop.on(AnonymousClient.stop)
 
 
 def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
@@ -51,7 +25,7 @@ def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
 
 @app.get("/resources/portrait/{portrait}", tags=["resources"])
 async def get_portrait(portrait: str) -> StreamingResponse:
-    image = await (await AnonymousClient.get_client()).get_portrait(portrait, size="s")
+    image = await (await AnonymousAiotieba.client()).get_portrait(portrait, size="s")
     return StreamingResponse(
         content=ndarray2image(image.img),
         media_type="image/webp",
@@ -61,7 +35,7 @@ async def get_portrait(portrait: str) -> StreamingResponse:
 
 @app.get("/resources/image/{hash}", tags=["resources"])
 async def get_image(hash: str, size: Literal["s", "m", "l"] = "s") -> StreamingResponse:  # noqa: A002
-    image = await (await AnonymousClient.get_client()).hash2image(hash, size=size)
+    image = await (await AnonymousAiotieba.client()).hash2image(hash, size=size)
     return StreamingResponse(
         content=ndarray2image(image.img),
         media_type="image/webp",

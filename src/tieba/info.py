@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
-import aiotieba
-
-from src.control import Controller
 from src.db.interface import Database
 from src.process.typedef import ProcessObject
+from src.util.anonymous import AnonymousAiotieba
 from src.util.cache import ExpireCache
 from src.util.logging import exception_logger
 
@@ -15,22 +13,7 @@ if TYPE_CHECKING:
 
 
 class TiebaInfo:
-    client: aiotieba.Client | None = None
     user_info_cache: ExpireCache[UserInfo] = ExpireCache(expire_time=86400, mem_max_size=3250)
-
-    @classmethod
-    async def stop(cls, _: None = None) -> None:
-        if cls.client:
-            await cls.client.__aexit__()
-            cls.client = None
-
-    @classmethod
-    async def get_client(cls) -> aiotieba.Client:
-        if not cls.client:
-            cls.client = aiotieba.Client()
-            await cls.client.__aenter__()
-
-        return cls.client
 
     class UserInfoDict(TypedDict):
         user_info: UserInfo | None
@@ -49,7 +32,7 @@ class TiebaInfo:
             if user_info := await cls.user_info_cache.get(_id):
                 return user_info
 
-            user_info = await (await cls.get_client()).get_user_info(_id)
+            user_info = await (await AnonymousAiotieba.client()).get_user_info(_id)
             if user_info.user_id:
                 await cls.user_info_cache.set(_id, user_info)
 
@@ -74,13 +57,12 @@ class TiebaInfo:
                 if thread:
                     data.data["is_thread_author"] = thread.author_id == data.content.user.user_id
                 else:
-                    posts = await (await cls.get_client()).get_posts(data.content.tid)  # try to fetch thread info
+                    posts = await (await AnonymousAiotieba.client()).get_posts(
+                        data.content.tid
+                    )  # try to fetch thread info
                     if posts:
                         data.data["is_thread_author"] = posts.thread.user.user_id == data.content.user.user_id
                     else:
                         data.data["is_thread_author"] = False
 
             return data.data["is_thread_author"]
-
-
-Controller.Stop.on(TiebaInfo.stop)

@@ -3,6 +3,7 @@ from src.util.logging import system_logger
 from .config import SystemConfig, read_config, write_config
 from .constance import SYSTEM_CONFIG_PATH
 from .typedef import Content, UpdateEventData
+from .util.anonymous import stop_anonymous_clients
 from .util.event import AsyncEvent
 
 
@@ -43,3 +44,6 @@ class Controller:
         write_config(new_config, SYSTEM_CONFIG_PATH)
         await cls.SystemConfigChange.broadcast(UpdateEventData(old=old_config, new=new_config))
         system_logger.info("系统配置已更改")
+
+
+Controller.Stop.on(stop_anonymous_clients)

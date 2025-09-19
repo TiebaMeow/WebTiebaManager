@@ -123,19 +123,13 @@ def exception_logger(
     /,
     logger=system_logger,
     reraise: bool = False,
-    ignore_exceptions: list[type[Exception]] | None = None,
+    ignore_exceptions: tuple[type[Exception], ...] | None = None,
 ):
     try:
         yield
     except Exception as exc:
-        if ignore_exceptions:
-            # 支持 tuple 或 list，且类型检查更高效
-            if isinstance(ignore_exceptions, (list, tuple)):
-                if isinstance(exc, tuple(ignore_exceptions)):
-                    return
-            elif isinstance(exc, ignore_exceptions):
-                return
-
+        if ignore_exceptions and isinstance(exc, ignore_exceptions):
+            return
         if message:
             logger.exception(f"{message}: {exc}")
         else:
