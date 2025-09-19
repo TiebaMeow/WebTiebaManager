@@ -9,7 +9,7 @@ from typing import Literal, TypedDict
 import aiohttp
 from pydantic import BaseModel
 
-from src.control import Controller
+from src.util.anonymous import AnonymousAiohttp
 from src.util.logging import LOG_DIR, exception_logger, system_logger
 
 
@@ -85,21 +85,6 @@ class QrcodeStatusData(BaseModel):
 
 
 class TiebaQrcodeLogin:
-    _client: aiohttp.ClientSession | None = None
-
-    @classmethod
-    async def client(cls) -> aiohttp.ClientSession:
-        if cls._client is None or cls._client.closed:
-            cls._client = aiohttp.ClientSession()
-            await cls._client.__aenter__()
-        return cls._client
-
-    @classmethod
-    async def stop(cls, _):
-        if cls._client and not cls._client.closed:
-            await cls._client.__aexit__(None, None, None)
-            cls._client = None
-
     @classmethod
     async def get_login_qrcode(cls) -> QrcodeData | None:
         """
@@ -109,7 +94,7 @@ class TiebaQrcodeLogin:
             有效的二维码数据或None
         """
         with exception_logger("获取二维码失败", ignore_exceptions=(asyncio.TimeoutError, aiohttp.ClientError)):
-            async with (await cls.client()).get(
+            async with (await AnonymousAiohttp.session()).get(
                 "https://passport.baidu.com/v2/api/getqrcode",
                 params={"lp": "pc"},
                 timeout=aiohttp.ClientTimeout(total=10),
@@ -169,7 +154,7 @@ class TiebaQrcodeLogin:
             当前的二维码状态
         """
         with exception_logger("获取登录结果失败"):
-            async with (await cls.client()).get(
+            async with (await AnonymousAiohttp.session()).get(
                 "https://passport.baidu.com/v3/login/main/qrbdusslogin", params={"bduss": channel_v}
             ) as resp:
                 if resp.status != 200:
@@ -214,7 +199,7 @@ class TiebaQrcodeLogin:
             当前的二维码状态
         """
         with exception_logger("获取二维码状态失败"):
-            async with (await cls.client()).get(
+            async with (await AnonymousAiohttp.session()).get(
                 "https://passport.baidu.com/channel/unicast", params={"channel_id": sign, "callback": ""}
             ) as resp:
                 if resp.status != 200:
@@ -260,6 +245,3 @@ class TiebaQrcodeLogin:
                 return await cls.get_login_result(channel_v["v"])
 
         return QrcodeStatusData(status=QrcodeStatus.FAILED)
-
-
-Controller.Stop.on(TiebaQrcodeLogin.stop)
