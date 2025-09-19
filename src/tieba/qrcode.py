@@ -8,7 +8,6 @@ from enum import Enum
 from typing import Literal, TypedDict
 
 import aiohttp
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.util.anonymous import AnonymousAiohttp
@@ -252,10 +251,9 @@ class TiebaQrcodeLogin:
         return QrcodeStatusData(status=QrcodeStatus.FAILED)
 
     @classmethod
-    async def qrcode_image(cls, sign: str):
+    async def qrcode_image(cls, sign: str) -> bytes:
         async with (await AnonymousAiohttp.session()).get(
             "https://passport.baidu.com/v2/api/qrcode",
             params={"lp": "pc", "sign": sign},
         ) as resp:
-            image_data = await resp.read()
-            return StreamingResponse(io.BytesIO(image_data), media_type="image/png")
+            return await resp.read()
