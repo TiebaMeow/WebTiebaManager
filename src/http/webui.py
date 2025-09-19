@@ -26,7 +26,7 @@ async def reverse_proxy(url: str, request: Request, raw=False):
 @app.get("/", tags=["webui"])
 async def index(request: Request):
     content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/index.html", request)
-    if Server.need_initialize:
+    if Server.need_initialize():
         content = content.replace(b"</head>", b'<script>location.href="/#/initialize"</script></head>')
         headers["Content-Length"] = str(len(content))
         headers["Cache-Control"] = "no-store"
@@ -46,4 +46,4 @@ class ServerInfo(BaseModel):
 
 @app.get("/api/info", tags=["webui"])
 async def webui_info() -> ServerInfo:
-    return ServerInfo(version=PROGRAM_VERSION, need_initialize=Server.need_initialize)
+    return ServerInfo(version=PROGRAM_VERSION, need_initialize=Server.need_initialize())

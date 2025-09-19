@@ -57,21 +57,18 @@ class BaseResponse[T](BaseModel):
 class Server:
     need_restart: bool = False
     server: uvicorn.Server | None = None
-    need_initialize: bool = False
 
     @classmethod
     def need_system(cls):
         return not SYSTEM_CONFIG_PATH.exists()
 
     @classmethod
-    async def need_user(cls):
-        # TODO 优化为无需async的检测
-        await UserManager.silent_load_users()
-        return not UserManager.users
+    def need_user(cls):
+        return not bool(UserManager.get_valid_usernames())
 
     @classmethod
-    async def update_need_initialize(cls):
-        cls.need_initialize = cls.need_system() or await cls.need_user()
+    def need_initialize(cls):
+        return cls.need_system() or cls.need_user()
 
     @classmethod
     def console_prompt(cls, config: ServerConfig, log_fn=system_logger.info):
@@ -93,8 +90,7 @@ class Server:
             server = uvicorn.Server(uvicorn.Config(app, **config.uvicorn_config_param))
             cls.server = server
 
-            await cls.update_need_initialize()
-            if cls.need_initialize:
+            if cls.need_initialize():
                 system_logger.warning("系统未初始化，请先进行初始化")
                 cls.console_prompt(config, log_fn=system_logger.warning)
             else:
