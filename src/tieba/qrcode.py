@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import re
 from enum import Enum
 from typing import Literal, TypedDict
-import io
 
 import aiohttp
-from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from src.util.anonymous import AnonymousAiohttp
 from src.util.logging import LOG_DIR, exception_logger, system_logger
