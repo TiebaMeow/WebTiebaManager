@@ -92,27 +92,10 @@ class GetPostData(BaseModel):
 
 
 class TiebaBrowser:
-    def __init__(self, BDUSS="", STOKEN="", tbs=""):
-        self._BDUSS = BDUSS
-        self._STOKEN = STOKEN
-        self._tbs = tbs
+    def __init__(self) -> None:
         self._session = aiohttp.ClientSession()
-        self._hd = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Cookie": "ka=open",
-            "cuid": "baidutiebaapp21ce9427-2a0c-40de-b07c-4d185bc939c6;l",
-            "User-Agent": "bdtb for Android 10.3.8.41",
-            "Connection": "Keep-Alive",
-            "cuid_galaxy2": "27591E20F4377A2A5EB340D71DAE60DA|VXQ5RBDUY",
-            "client_user_token": "1969446685",
-            "Accept-Encoding": "gzip",
-            "client_logid": "1667064046918",
-            "Host": "c.tieba.baidu.com",
-        }
-        self._hd2 = {"Cookie": f"BDUSS={self._BDUSS}; STOKEN={self._STOKEN};"}
 
     async def __aenter__(self):
-        self._tbs = await self.get_tbs()
         return self
 
     async def __aexit__(self, exc_type=None, exc_val=None, exc_tb=None):
@@ -129,11 +112,6 @@ class TiebaBrowser:
             + "tiebaclient!!!"
         )
         data["sign"] = hashlib.md5(buffer.encode("utf-8")).hexdigest()
-
-    async def get_tbs(self):
-        async with self._session.get("http://tieba.baidu.com/dc/common/tbs", headers=self._hd2) as res:
-            data = json.loads(await res.text())
-        return data["tbs"]
 
     @staticmethod
     async def parse_data(data: GetPostsResponse):
@@ -232,7 +210,6 @@ class TiebaBrowser:
         self,
         url,
         data=None,
-        need_tbs=False,
         need_timestamp=False,
         need_sign=True,
         **kwargs,
@@ -242,8 +219,6 @@ class TiebaBrowser:
             if data is not None
             else {}
         )
-        if need_tbs:
-            data["tbs"] = self._tbs
         if need_timestamp:
             data["timestamp"] = f"{time.time()}"
         if need_sign:
@@ -264,8 +239,6 @@ class TiebaBrowser:
             res = await self.post(
                 "http://c.tieba.baidu.com/c/f/pb/page",
                 data,
-                need_tbs=True,
-                headers=self._hd,
                 **kwargs,
             )
             if res.status != 200:
