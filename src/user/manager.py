@@ -19,8 +19,39 @@ class UserManager:
     UserChange = AsyncEvent[None]()
 
     @classmethod
+    def get_valid_usernames(cls) -> list[str]:
+        """
+        用于检测是否有有效的用户
+
+        Returns:
+            list[str]: 有效用户名列表
+        """
+        if cls.users:
+            return list(cls.users.keys())
+
+        usernames = []
+
+        for userdir in USER_DIR.iterdir():
+            if not userdir.is_dir():
+                continue
+
+            user_config_path = userdir / User.CONFIG_FILE
+            if not user_config_path.exists():
+                continue
+
+            try:
+                user_config = read_config(user_config_path, UserConfig)
+            except Exception:
+                continue
+            if user_config.user.username != userdir.stem:
+                continue
+
+            usernames.append(user_config.user.username)
+
+        return usernames
+
+    @classmethod
     async def silent_load_users(cls):
-        # server在判断是否需要初始化时会调用此函数，先于UserManager.load_users
         await cls.clear_users()
 
         for user_dir in USER_DIR.iterdir():

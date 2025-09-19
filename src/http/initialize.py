@@ -42,6 +42,7 @@ class SystemRequest(BaseModel):
 class InitializeRequest(BaseModel):
     user: UserRequest | None = None
     system: SystemRequest | None = None
+    secure_key: str
 
 
 class GetInitializeInfoData(BaseModel):
@@ -52,16 +53,19 @@ class GetInitializeInfoData(BaseModel):
 @app.get("/api/initialize/get_info", tags=["initialize"])
 async def get_initialize_info() -> BaseResponse[GetInitializeInfoData]:
     return BaseResponse(
-        code=200, data=GetInitializeInfoData(need_system=Server.need_system(), need_user=await Server.need_user())
+        code=200, data=GetInitializeInfoData(need_system=Server.need_system(), need_user=Server.need_user())
     )
 
 
 @app.post("/api/initialize/initialize", tags=["initialize"])
 async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
-    if not Server.need_initialize:
+    if not Server.need_initialize():
         raise HTTPException(status_code=400, detail="系统已经初始化")
 
-    if await Server.need_user():
+    if request.secure_key != Server.secure_key():
+        raise HTTPException(status_code=400, detail="初始化密钥错误")
+
+    if Server.need_user():
         if not request.user:
             raise HTTPException(status_code=400, detail="请填写用户配置")
         user_config = UserConfig(user=UserInfo.model_validate(request.user.model_dump()))

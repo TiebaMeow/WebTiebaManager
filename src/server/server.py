@@ -6,22 +6,35 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.constance import DEV, MAIN_SERVER, SYSTEM_CONFIG_PATH
+from src.constance import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
 from src.control import Controller
 from src.tieba import crawler
 from src.user.manager import UserManager
 from src.util.logging import exception_logger, system_logger
+from src.util.tools import random_str
 
 from .config import ServerConfig
 
 HTTP_ALLOW_ORIGINS = ["*" if DEV else MAIN_SERVER]
 
 
+def initialize_server_config():
+    if PUBLIC:
+        system_logger.warning("正在以公网模式运行，请尽快完成初始化")
+        return ServerConfig(host="0.0.0.0")
+    else:
+        return ServerConfig()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await Controller.start()
+    if Server.need_initialize():
+        system_logger.warning(f"初始化密钥: {Server.secure_key()}")
+
     yield
     await Controller.stop()
+    Server._secure_key = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -57,39 +70,52 @@ class BaseResponse[T](BaseModel):
 class Server:
     need_restart: bool = False
     server: uvicorn.Server | None = None
-    need_initialize: bool = False
+    _secure_key: str | None = None
+
+    @classmethod
+    def secure_key(cls):
+        if cls._secure_key is None:
+            cls._secure_key = random_str(8)
+        return cls._secure_key
 
     @classmethod
     def need_system(cls):
         return not SYSTEM_CONFIG_PATH.exists()
 
     @classmethod
-    async def need_user(cls):
-        # TODO 优化为无需async的检测
-        await UserManager.silent_load_users()
-        return not UserManager.users
+    def need_user(cls):
+        return not bool(UserManager.get_valid_usernames())
 
     @classmethod
-    async def update_need_initialize(cls):
-        cls.need_initialize = cls.need_system() or await cls.need_user()
+    def need_initialize(cls):
+        return cls.need_system() or cls.need_user()
+
+    @classmethod
+    def console_prompt(cls, config: ServerConfig, log_fn=system_logger.info):
+        listenable_urls = config.listenable_urls
+        if len(listenable_urls) == 1:
+            log_fn(f"访问 {listenable_urls[0]} 进行管理")
+        else:
+            log_fn("访问以下地址进行管理:")
+            for url in listenable_urls:
+                log_fn(f"- {url}")
 
     @classmethod
     async def serve(cls):
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
 
-            config = ServerConfig() if cls.need_system() else Controller.config.server
+            config = initialize_server_config() if cls.need_system() else Controller.config.server
 
             server = uvicorn.Server(uvicorn.Config(app, **config.uvicorn_config_param))
             cls.server = server
 
-            await cls.update_need_initialize()
-            if cls.need_initialize:
+            if cls.need_initialize():
                 system_logger.warning("系统未初始化，请先进行初始化")
-                system_logger.warning(f"访问 {config.url} 进行初始化")
+                cls.console_prompt(config, log_fn=system_logger.warning)
             else:
                 system_logger.info("正在启动服务")
-                system_logger.info(f"访问 {config.url} 进行管理")
+                cls.console_prompt(config)
 
             await server.serve()
 
@@ -112,9 +138,9 @@ class Server:
         try:
             with exception_logger("服务运行异常", reraise=True):
                 if DEV:
-                    config = ServerConfig() if cls.need_system() else Controller.config.server
+                    config = initialize_server_config() if cls.need_system() else Controller.config.server
                     system_logger.warning("开发模式运行，请勿在生产环境使用")
-                    system_logger.warning(f"访问 {config.url} 进行管理")
+                    cls.console_prompt(config, log_fn=system_logger.warning)
                     cls.dev_run(config)
                 else:
                     import asyncio
