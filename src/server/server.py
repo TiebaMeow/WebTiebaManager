@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.constance import DEV, MAIN_SERVER, SYSTEM_CONFIG_PATH
+from src.constance import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
 from src.control import Controller
 from src.tieba import crawler
 from src.user.manager import UserManager
@@ -15,6 +15,14 @@ from src.util.logging import exception_logger, system_logger
 from .config import ServerConfig
 
 HTTP_ALLOW_ORIGINS = ["*" if DEV else MAIN_SERVER]
+
+
+def initialize_server_config():
+    if PUBLIC:
+        system_logger.warning("正在以公网模式运行，请尽快完成初始化")
+        return ServerConfig(host="0.0.0.0")
+    else:
+        return ServerConfig()
 
 
 @asynccontextmanager
@@ -85,7 +93,7 @@ class Server:
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
 
-            config = ServerConfig() if cls.need_system() else Controller.config.server
+            config = initialize_server_config() if cls.need_system() else Controller.config.server
 
             server = uvicorn.Server(uvicorn.Config(app, **config.uvicorn_config_param))
             cls.server = server
@@ -118,7 +126,7 @@ class Server:
         try:
             with exception_logger("服务运行异常", reraise=True):
                 if DEV:
-                    config = ServerConfig() if cls.need_system() else Controller.config.server
+                    config = initialize_server_config() if cls.need_system() else Controller.config.server
                     system_logger.warning("开发模式运行，请勿在生产环境使用")
                     cls.console_prompt(config, log_fn=system_logger.warning)
                     cls.dev_run(config)
