@@ -86,6 +86,9 @@ class QrcodeStatusData(BaseModel):
     account: AccountInfo | None = None
 
 
+IGNORE_EXPECTIONS = (asyncio.TimeoutError, aiohttp.ClientError)
+
+
 class TiebaQrcodeLogin:
     @classmethod
     async def get_login_qrcode(cls) -> QrcodeData | None:
@@ -95,7 +98,7 @@ class TiebaQrcodeLogin:
         Returns:
             有效的二维码数据或None
         """
-        with exception_logger("获取二维码失败", ignore_exceptions=(asyncio.TimeoutError, aiohttp.ClientError)):
+        with exception_logger("获取二维码失败", ignore_exceptions=IGNORE_EXPECTIONS):
             async with (await AnonymousAiohttp.session()).get(
                 "https://passport.baidu.com/v2/api/getqrcode",
                 params={"lp": "pc"},
