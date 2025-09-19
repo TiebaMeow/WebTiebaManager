@@ -1,5 +1,4 @@
 import asyncio
-import random
 import re
 import secrets
 import socket
@@ -198,4 +197,4 @@ def random_str(length: int = 8) -> str:
     :param length: 字符串长度，默认8
     :return: 随机字符串
     """
-    return "".join(random.choices(RANDOM_CHARS, k=length))
+    return "".join(secrets.choice(RANDOM_CHARS) for _ in range(length))
