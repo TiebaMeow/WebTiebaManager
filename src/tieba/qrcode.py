@@ -139,12 +139,19 @@ class TiebaQrcodeLogin:
         """
         result = {}
         correct_text = stoken_list.replace("&quot;", '"')
-        for item in json.loads(correct_text):
-            if "#" in item:
-                key, value = item.split("#", 1)
-                result[key] = value
+        try:
+            for item in json.loads(correct_text):
+                if "#" in item:
+                    key, value = item.split("#", 1)
+                    result[key] = value
 
-        return result.get("tb", "")
+            return result.get("tb", "")
+
+        except json.JSONDecodeError:
+            file = LOG_DIR / "tieba.qrbdusslogin.stoken.txt"
+            file.write_text(stoken_list, encoding="utf-8")
+            system_logger.warning(f"解析stokenList失败，原始数据已保存至{file}")
+            return ""
 
     @classmethod
     async def get_login_result(cls, channel_v: str) -> QrcodeStatusData:
@@ -168,12 +175,13 @@ class TiebaQrcodeLogin:
                 try:
                     correct_text = re.sub(r"'([^']+)'", r'"\1"', text.replace("\\&", "&"))  # 将单引号改为双引号
                     data: QrBdussLoginResponse = json.loads(correct_text)
-                    stoken = cls.parse_stoken_list(data["data"]["session"]["stokenList"])
                 except json.JSONDecodeError:
                     file = LOG_DIR / "tieba.qrbdusslogin.txt"
                     file.write_text(text, encoding="utf-8")
                     system_logger.warning(f"获取二维码状态返回非JSON数据，原始数据已保存至{file}")
                     return QrcodeStatusData(status=QrcodeStatus.FAILED)
+
+                stoken = cls.parse_stoken_list(data["data"]["session"]["stokenList"])
 
                 system_logger.debug(f"获取登录结果返回: {data}")
 
