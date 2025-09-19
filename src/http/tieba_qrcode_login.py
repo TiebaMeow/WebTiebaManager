@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fastapi.responses import StreamingResponse  # noqa: TC002
 from pydantic import BaseModel
 
 from src.server import BaseResponse, app, current_user_depends
@@ -36,3 +37,9 @@ async def get_tieba_qrcode_status(
         return BaseResponse(data=data, message="获取二维码状态失败", code=500)
 
     return BaseResponse(data=data)
+
+
+@app.get("/api/tieba/qrcode_image", tags=["tieba"])
+async def get_tieba_qrcode_image(sign: str) -> StreamingResponse:
+    """获取二维码图片"""
+    return await TiebaQrcodeLogin.qrcode_image(sign[::-1])

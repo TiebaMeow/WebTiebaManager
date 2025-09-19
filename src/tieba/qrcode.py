@@ -5,9 +5,11 @@ import json
 import re
 from enum import Enum
 from typing import Literal, TypedDict
+import io
 
 import aiohttp
 from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
 
 from src.util.anonymous import AnonymousAiohttp
 from src.util.logging import LOG_DIR, exception_logger, system_logger
@@ -245,3 +247,12 @@ class TiebaQrcodeLogin:
                 return await cls.get_login_result(channel_v["v"])
 
         return QrcodeStatusData(status=QrcodeStatus.FAILED)
+
+    @classmethod
+    async def qrcode_image(cls, sign: str):
+        async with (await AnonymousAiohttp.session()).get(
+            "https://passport.baidu.com/v2/api/qrcode",
+            params={"lp": "pc", "sign": sign},
+        ) as resp:
+            image_data = await resp.read()
+            return StreamingResponse(io.BytesIO(image_data), media_type="image/png")
