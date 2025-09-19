@@ -2,13 +2,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.util.tools import Mosaic, get_listenable_addresses, int_time, random_secret, validate_password
+from src.util.tools import Mosaic, get_listenable_addresses, int_time, random_secret, random_str, validate_password
 
 
 class ServerConfig(BaseModel, extra="ignore"):
     host: str = "localhost"
     port: int = 36799
-    key: str = Field(default_factory=lambda: random_secret(16))
+    key: str = Field(default_factory=lambda: random_str(16))
     secret_key: str = Field(default_factory=random_secret)
     log_level: Literal["info", "warning", "error"] = "warning"
     access_log: bool = False

@@ -18,7 +18,7 @@ from src.user.config import (
 from src.user.manager import UserManager
 from src.util.cache import ClearCache, ExpireCache
 from src.util.logging import system_logger
-from src.util.tools import random_secret, validate_password
+from src.util.tools import random_str, validate_password
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")
@@ -99,7 +99,7 @@ async def delete_user(system_access: ensure_system_access_depends, req: DeleteRe
 async def create_invite_code(system_access: ensure_system_access_depends, req: UserInfodata) -> BaseResponse[str]:
     if not req.code:
         for _ in range(10):
-            req.code = random_secret(4)
+            req.code = random_str(8)
             if CodeCache.get(req.code) is None:
                 break
         else:

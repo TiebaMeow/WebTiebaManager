@@ -1,7 +1,9 @@
 import asyncio
+import random
 import re
 import secrets
 import socket
+import string
 import time
 
 
@@ -182,3 +184,13 @@ def validate_password(password: str, max_length: int = 32) -> bool:
     """
     pattern = r"^[a-zA-Z0-9\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]+$"
     return len(password) <= max_length and bool(re.match(pattern, password))
+
+
+def random_str(length: int = 8) -> str:
+    """
+    生成指定长度的随机字符串，字符集为0-9a-zA-Z。
+    :param length: 字符串长度，默认8
+    :return: 随机字符串
+    """
+    chars = string.ascii_letters + string.digits
+    return "".join(random.choices(chars, k=length))
