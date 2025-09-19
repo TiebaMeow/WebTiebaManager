@@ -115,7 +115,7 @@ class ExpireCache[T]:
             if expire == NOT_EXIST:
                 expired_keys.add(key)
         if expired_keys:
-            await self.cache.delete(*expired_keys)
+            await self.cache.delete_many(*expired_keys)
 
     async def clear(self) -> None:
         await self.cache.clear()
