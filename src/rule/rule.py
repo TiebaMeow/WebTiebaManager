@@ -69,8 +69,19 @@ class Rules:
         category: str,
         description: str = "无描述",
         default_options: Any = None,
-        values: dict[str, str] | None = None,  # 用于CheckBox/Select，提供给网页端信息
+        values: dict[str, str] | None = None,
     ):
+        """
+        注册规则
+
+        Args:
+            name (str): 规则名称 如 "用户名"
+            category (str): 规则分类 如 "用户"
+            description (str): 规则描述 note 目前webui未使用此值
+            default_options (Any): 规则默认配置
+            values (dict[str, str] | None): 用于CheckBox/Select，提供给网页端信息 {原键: 用户友好名称}
+        """
+
         def wrapper(rule: type[RuleTemplate]):
             nonlocal default_options
 
@@ -107,6 +118,16 @@ class Rules:
 
     @classmethod
     def fix_category(cls, category: str):
+        """
+        固定分类
+
+        Args:
+            category (str): 规则分类 如 "用户"
+
+        Returns:
+            Callable: 装饰器 Rules.register，移除了category参数
+        """
+
         def _(
             name: str, description: str = "无描述", default_options: Any = None, values: dict[str, str] | None = None
         ):
