@@ -19,6 +19,7 @@ from enum import IntFlag
 from typing import TYPE_CHECKING, Literal
 
 import aiotieba.typing as aiotieba
+from pydantic import ValidationError
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -116,11 +117,16 @@ class Database:
         """
         import asyncio
 
-        config = DatabaseConfig.model_validate(config)
-        test_engine = create_async_engine(
-            config.database_url,
-            pool_pre_ping=(config.type != "sqlite"),
-        )
+        try:
+            config = DatabaseConfig.model_validate(config)
+            test_engine = create_async_engine(
+                config.database_url,
+                pool_pre_ping=(config.type != "sqlite"),
+            )
+        except (ValueError, ValidationError):
+            return False, ValueError("数据库配置无效")
+        except Exception as e:
+            return False, e
 
         async def _test():
             async with test_engine.connect() as conn:
