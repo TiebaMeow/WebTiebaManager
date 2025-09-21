@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from src.constance import PID_CACHE_EXPIRE
 from src.control import Controller
-from src.db.interface import ContentModel, Database, UpdateStatus
+from src.db import ContentModel, Database, UpdateStatus
 from src.typedef import Comment, Post, Thread
 from src.user.manager import UserManager
 from src.util.cache import ClearCache

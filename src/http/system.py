@@ -6,8 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.config import SystemConfig  # noqa: TC001
 from src.constance import BASE_DIR, CODE_EXPIRE
 from src.control import Controller
-from src.db.config import DatabaseConfig  # noqa: TC001
-from src.db.interface import Database
+from src.db import Database, DatabaseConfig
 from src.server import BaseResponse, app, ensure_system_access_depends, ip_depends
 from src.user.config import (
     ForumConfig,

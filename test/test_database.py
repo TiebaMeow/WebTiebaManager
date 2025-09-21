@@ -7,8 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import pytest_asyncio
 
-from src.db.config import DatabaseConfig
-from src.db.models import ContentModel, Image
+from src.db import ContentModel, DatabaseConfig, Image
 
 # 注入一个最小化的 src.control 以避免导入时的循环依赖
 module = types.ModuleType("src.control")
@@ -140,7 +139,7 @@ async def test_upsert_with_exclude_all_nonpk_no_update(setup_db):
 
 
 def test_mixed_model_raise_type_error():
-    from src.db.models import ForumModel
+    from src.db import ForumModel
 
     f = ForumModel(fname="f", fid=1)
     c = make_content(999)
