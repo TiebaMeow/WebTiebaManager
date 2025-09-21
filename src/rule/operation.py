@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 from src.tieba import TiebaInfo
 
 if TYPE_CHECKING:
-    from src.process.typedef import ProcessObject
+    from src.process import ProcessObject
 
 
 class OperationTemplate(BaseModel):

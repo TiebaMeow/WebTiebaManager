@@ -8,7 +8,7 @@ from .rule import Rules
 from .template import LimiterRule, TextRule
 
 if TYPE_CHECKING:
-    from src.process.typedef import ProcessObject
+    from src.process import ProcessObject
 
 user_register = Rules.fix_category("用户")
 

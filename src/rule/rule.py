@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, TypeAdapter
 
 if TYPE_CHECKING:
-    from src.process.typedef import ProcessObject
+    from src.process import ProcessObject
 
 
 class RuleInfo(BaseModel):

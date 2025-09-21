@@ -8,8 +8,7 @@ import aiotieba
 
 from src.constance import USER_DIR
 from src.control import Controller
-from src.process.process import Processer
-from src.process.typedef import ProcessObject
+from src.process import Processer, ProcessObject
 from src.rule.operation import OperationGroup
 from src.tieba import TiebaInfo
 from src.util.config import write_config

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypedDict
 
 from src.db import Database
-from src.process.typedef import ProcessObject
+from src.process import ProcessObject
 from src.util.anonymous import AnonymousAiotieba
 from src.util.cache import ExpireCache
 from src.util.logging import exception_logger
