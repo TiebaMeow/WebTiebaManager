@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from src.tieba.info import TiebaInfo
+from src.tieba import TiebaInfo
 
 from .rule import Rules
 from .template import LimiterRule, TextRule

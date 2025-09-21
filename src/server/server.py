@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 from src.constance import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
 from src.control import Controller
-from src.tieba import crawler
 from src.user.manager import UserManager
 from src.util.logging import exception_logger, system_logger
 from src.util.tools import random_str

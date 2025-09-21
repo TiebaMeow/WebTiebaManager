@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
-from src.util.config import write_config
 from src.constance import USER_DIR
 from src.control import Controller
 from src.process.process import Processer
 from src.process.typedef import ProcessObject
 from src.rule.operation import OperationGroup
-from src.tieba.info import TiebaInfo
+from src.tieba import TiebaInfo
+from src.util.config import write_config
 from src.util.logging import LogRecorder, logger
 from src.util.tools import int_time
 

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from src.tieba.info import TiebaInfo
+from src.tieba import TiebaInfo
 
 if TYPE_CHECKING:
     from src.process.typedef import ProcessObject

@@ -4,7 +4,7 @@ from src.db.config import DatabaseConfig
 
 from .constance import BASE_DIR
 from .server import ServerConfig
-from .tieba.config import ScanConfig
+from .tieba import ScanConfig
 
 
 class SystemConfig(BaseModel, extra="ignore"):
