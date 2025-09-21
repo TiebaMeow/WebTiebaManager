@@ -1,6 +1,7 @@
 from src.util.logging import system_logger
 
-from .config import SystemConfig, read_config, write_config
+from src.util.config import read_config, write_config
+from .config import SystemConfig
 from .constance import SYSTEM_CONFIG_PATH
 from .typedef import Content, UpdateEventData
 from .util.anonymous import stop_anonymous_clients

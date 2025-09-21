@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
-from src.config import write_config
+from src.util.config import write_config
 from src.constance import USER_DIR
 from src.control import Controller
 from src.process.process import Processer

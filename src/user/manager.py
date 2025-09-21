@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 
-from src.config import read_config, write_config
+from src.util.config import read_config, write_config
 from src.constance import USER_DIR
 from src.control import Controller
 from src.util.event import AsyncEvent
