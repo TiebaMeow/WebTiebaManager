@@ -1,21 +1,41 @@
-from src.util.logging import system_logger
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from src.util.config import read_config, write_config
-from .config import SystemConfig
+from src.util.logging import system_logger
+
 from .constance import SYSTEM_CONFIG_PATH
 from .typedef import Content, UpdateEventData
 from .util.anonymous import stop_anonymous_clients
 from .util.event import AsyncEvent
 
+if TYPE_CHECKING:
+    from .config import SystemConfig  # noqa: TC004
+
 
 class Controller:
     Start = AsyncEvent[None]()
     Stop = AsyncEvent[None]()
-    SystemConfigChange = AsyncEvent[UpdateEventData[SystemConfig]]()
     DispatchContent = AsyncEvent[Content]()
+    SystemConfigChange: AsyncEvent[UpdateEventData[SystemConfig]] = AsyncEvent()
+    config: SystemConfig
 
-    config: SystemConfig = read_config(SYSTEM_CONFIG_PATH, SystemConfig)
     running: bool = False
+
+    @classmethod
+    def initialize(cls):
+        """
+        在所有包导入后调用，预加载配置
+        """
+        try:
+            from .config import SystemConfig  # noqa: TC001
+        except Exception:
+            system_logger.exception("导入 SystemConfig 失败，可能是循环导入导致")
+            raise
+
+        if not getattr(cls, "config", None):
+            cls.config = read_config(SYSTEM_CONFIG_PATH, SystemConfig)
 
     @classmethod
     async def start(cls):
@@ -41,7 +61,7 @@ class Controller:
             return
 
         old_config = cls.config
-        cls.config = new_config
+        cls._config = new_config
         write_config(new_config, SYSTEM_CONFIG_PATH)
         await cls.SystemConfigChange.broadcast(UpdateEventData(old=old_config, new=new_config))
         system_logger.info("系统配置已更改")

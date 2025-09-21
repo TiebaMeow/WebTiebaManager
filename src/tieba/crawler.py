@@ -185,7 +185,7 @@ class Spider:
 
 
 class Crawler:
-    spider = Spider()
+    spider: Spider | None = None
     needs: dict[str, CrawlNeed] = {}
     task: asyncio.Task | None = None
 
@@ -261,15 +261,21 @@ class Crawler:
         while True:
             with exception_logger("爬虫循环异常"):
                 for forum, need in cls.needs.items():
-                    async for content in cls.spider.crawl(forum, need):
+                    async for content in cls.get_spider().crawl(forum, need):
                         system_logger.debug(f"爬取到新内容 {content.mark} 来自 {forum}")
                         await Database.save_items([ContentModel.from_content(content)])
                         await Controller.DispatchContent.broadcast(content)
             await asyncio.sleep(Controller.config.scan.loop_cd)
 
     @classmethod
+    def get_spider(cls) -> Spider:
+        if not cls.spider:
+            cls.spider = Spider()
+        return cls.spider
+
+    @classmethod
     async def start(cls):
-        await cls.spider.init_client()
+        await cls.get_spider().init_client()
 
 
 UserManager.UserChange.on(Crawler.update_needs)
