@@ -128,7 +128,7 @@ class Server:
     @classmethod
     def dev_run(cls, config: ServerConfig):
         uvicorn.run(
-            "src.server.server:app", host=config.host, port=config.port, log_level="info", access_log=True, reload=True
+            "src.api.server:app", host=config.host, port=config.port, log_level="info", access_log=True, reload=True
         )
 
     @classmethod
