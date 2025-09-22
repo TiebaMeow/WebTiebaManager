@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from src.utils.tools import int_time, validate_password
 
-from .tieba import Content  # noqa: TC001
+from .tieba import Content  # noqa: TC001 UserInfo用于Fastapi，禁止移入TYPE_CHECKING
 
 
 class ConfirmSimpleData(BaseModel):
