@@ -120,15 +120,19 @@ class TiebaClient:
         return True
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        self.logger.info(f"正在封禁 {content.user.log_name}", uid=content.user.user_id)
+        self.logger.info(f"正在封禁 {content.user.log_name}", uid=content.user.user_id, portrait=content.user.portrait)
         try:
-            result = await self.client.block(content.fname, content.user.user_id, day=day, reason=reason)
+            result = await self.client.block(content.fname, content.user.portrait, day=day, reason=reason)
         except TiebaClient.InvalidClientError:
             self.logger.warning("无法封禁，未登录")
             return False
 
         if not result:
-            self.logger.warning(f"封禁失败 {content.user.log_name} {result.err}", uid=content.user.user_id)
+            self.logger.warning(
+                f"封禁失败 {content.user.log_name} {result.err}",
+                uid=content.user.user_id,
+                portrait=content.user.portrait,
+            )
             return False
 
         return True
@@ -246,6 +250,7 @@ class User:
                 tid=content.tid,
                 pid=content.pid,
                 uid=content.user.user_id,
+                portrait=content.user.portrait,
             )
             await self.operate_rule_set(obj, result_rule_set)
 
