@@ -5,21 +5,17 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from src.rule.rule import RuleInfo, Rules
+from src.core.config import ForumConfig, ProcessConfig, RuleSetConfig  # noqa: TC001
+from src.rule.rule import Rules
+from src.schemas.rule import RuleInfo  # noqa: TC001
 
 # 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
-from src.rule.rule_set import RuleSetConfig  # noqa: TC001
-from src.user.config import ForumConfig, ProcessConfig, UserPermission  # noqa: TC001
-from src.user.confirm import ConfirmSimpleData  # noqa: TC001
+from src.schemas.user import ConfirmSimpleData, UserPermission  # noqa: TC001
 from src.user.manager import User, UserManager
 from src.user.user import TiebaClientStatus
 
-from ..server import (
-    BaseResponse,
-    app,
-    current_user_depends,
-    system_access_depends,
-)
+from ..auth import current_user_depends, system_access_depends  # noqa: TC001
+from ..server import BaseResponse, app
 
 
 class GetHomeInfoAccount(BaseModel):

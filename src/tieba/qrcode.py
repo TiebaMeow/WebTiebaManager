@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import json
 import re
-from enum import Enum
 from typing import Literal, TypedDict
 
 import aiohttp
-from pydantic import BaseModel
 
-from src.util.anonymous import AnonymousAiohttp
-from src.util.logging import LOG_DIR, exception_logger, system_logger
+from src.schemas.tieba import AccountInfo, QrcodeData, QrcodeStatus, QrcodeStatusData
+from src.utils.anonymous import AnonymousAiohttp
+from src.utils.logging import LOG_DIR, exception_logger, system_logger
 
 
 class GetQrcodeResponse(TypedDict):
@@ -19,13 +17,6 @@ class GetQrcodeResponse(TypedDict):
     errno: int
     sign: str
     prompt: str
-
-
-class QrcodeData(BaseModel):
-    imgurl: str = ""
-    errno: int
-    sign: str = ""
-    prompt: str = ""
 
 
 class ChannelVData(TypedDict):
@@ -64,25 +55,6 @@ class QrBdussLoginResponse(TypedDict):
     errInfo: QBErrorInfo
     data: QBData
     code: str
-
-
-class QrcodeStatus(Enum):
-    WAITING = "WAITING"  # 等待扫码
-    SCANNED = "SCANNED"  # 已扫码，等待确认
-    EXPIRED = "EXPIRED"  # 二维码过期
-    FAILED = "FAILED"  # 登录失败
-    SUCCESS = "SUCCESS"  # 登录成功
-
-
-class AccountInfo(BaseModel):
-    bduss: str
-    stoken: str
-    user_name: str
-
-
-class QrcodeStatusData(BaseModel):
-    status: QrcodeStatus
-    account: AccountInfo | None = None
 
 
 IGNORE_EXPECTIONS = (asyncio.TimeoutError, aiohttp.ClientError)

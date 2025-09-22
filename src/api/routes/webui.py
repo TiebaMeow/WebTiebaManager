@@ -1,9 +1,10 @@
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from src.constance import MAIN_SERVER, PROGRAM_VERSION, WEB_UI_VERSION
-from src.server import Server, app
-from src.util.anonymous import AnonymousAiohttp
+from src.core.constants import MAIN_SERVER, PROGRAM_VERSION, WEB_UI_VERSION
+from src.utils.anonymous import AnonymousAiohttp
+
+from ..server import Server, app
 
 WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_VERSION}"
 

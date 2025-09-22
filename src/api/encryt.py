@@ -1,6 +1,6 @@
 from hashlib import md5
 
-from src.control import Controller
+from src.core.controller import Controller
 
 
 def encrypt(password: str):

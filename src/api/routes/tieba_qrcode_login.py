@@ -5,8 +5,11 @@ import io
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.server import BaseResponse, app, current_user_depends
-from src.tieba.qrcode import QrcodeData, QrcodeStatus, QrcodeStatusData, TiebaQrcodeLogin
+from src.schemas.tieba import QrcodeData, QrcodeStatus, QrcodeStatusData
+from src.tieba.qrcode import TiebaQrcodeLogin
+
+from ..auth import current_user_depends  # noqa: TC001
+from ..server import BaseResponse, app
 
 
 @app.get("/api/tieba/get_qrcode", tags=["tieba"])

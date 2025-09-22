@@ -32,7 +32,7 @@ class _DummyController:
 module.Controller = _DummyController  # type: ignore
 sys.modules["src.control"] = module
 
-import src.util.cache as cache
+import src.utils.cache as cache
 
 
 @pytest.mark.asyncio
@@ -118,6 +118,7 @@ class DummyScheduler:
 def test_cache_cleaner_start_update_stop(monkeypatch):
     # 替换为 DummyScheduler
     monkeypatch.setattr(cache, "AsyncIOScheduler", DummyScheduler)
+    cache.Controller.initialize()
 
     # 确保初始状态
     cache.CacheCleaner._clear_cache_scheduler = None
