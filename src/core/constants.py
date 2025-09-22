@@ -28,6 +28,7 @@ USER_DIR = BASE_DIR / "users"
 LOG_FILE_NAME = "webtm.log"
 LOG_DIR = BASE_DIR / "logs"
 SYSTEM_CONFIG_PATH = BASE_DIR / "config.toml"
+RESOURCE_DIR = BASE_DIR.parent / "resources"
 
 
 DEFAULT_SERVER_PORT = 36799
