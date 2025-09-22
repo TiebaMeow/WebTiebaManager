@@ -6,6 +6,7 @@ MAIN_SERVER = "https://webtm.tbw.icu"
 DEV = "dev" in sys.argv or "--dev" in sys.argv
 DEBUG = "--debug" in sys.argv
 PUBLIC = "--public" in sys.argv
+DEV_WEBUI = DEV or "--dev-webui" in sys.argv
 
 PROGRAM_VERSION = "1.0.0"
 CONFIG_VERSION = 1
