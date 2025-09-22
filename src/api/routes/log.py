@@ -52,7 +52,8 @@ async def realtime_log(name: str, request: Request):
 
     async def log_listener(data: LogEventData):
         try:
-            if data.name != name:
+            if data.name != name and name != "system":
+                # 不是发给当前用户的日志 / 订阅者不是 system
                 return
 
             log_data = LogData.from_message(data.message)
@@ -110,7 +111,8 @@ async def get_log(target_name: str, file: str):
                 else:
                     name = "unknown"
 
-                if name != target_name:
+                if name != target_name and target_name != "system":
+                    # 不是当前用户的日志 / 订阅者不是 system
                     continue
 
                 logs.append(
