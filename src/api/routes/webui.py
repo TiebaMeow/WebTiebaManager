@@ -58,9 +58,12 @@ async def resources(path: str, request: Request):
     if ".." in path or path.startswith("/") or Path(path).is_absolute():
         return Response(status_code=400, content="Bad Request")
 
-    file_path = RESOURCE_DIR / path
+    file_path = (RESOURCE_DIR / path).resolve()
 
-    if not file_path.exists() or not file_path.is_file() or not file_path.is_relative_to(RESOURCE_DIR):
+    if not file_path.is_relative_to(RESOURCE_DIR.resolve()):
+        return Response(status_code=400, content="Bad Request")
+
+    if not file_path.exists() or not file_path.is_file():
         return Response(status_code=404, content="Not Found")
 
     return FileResponse(file_path)
