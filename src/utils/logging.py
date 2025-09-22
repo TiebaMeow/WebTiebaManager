@@ -77,6 +77,16 @@ class LogRecorder:
     def get_records(cls, name: str) -> list[Message]:
         return cls.messages.get(name, [])
 
+    @classmethod
+    def get_all_records(cls, limit: bool = True) -> list[Message]:
+        messages: list[Message] = []
+        for name in cls.messages:
+            messages.extend(cls.messages[name])
+        messages.sort(key=lambda msg: msg.record["time"].timestamp())
+        if limit and len(messages) > cls.MAX_LINES:
+            messages = messages[-cls.MAX_LINES :]
+        return messages
+
 
 # 移除默认处理器
 logger.remove()

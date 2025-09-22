@@ -44,7 +44,10 @@ async def get_log_list(user: current_user_depends) -> BaseResponse[list[str]]:
 
 
 async def realtime_log(name: str, request: Request):
-    records = [LogData.from_message(i) for i in LogRecorder.get_records(name)]
+    records = [
+        LogData.from_message(i)
+        for i in (LogRecorder.get_all_records() if name == "system" else LogRecorder.get_records(name))
+    ]
     queue = asyncio.Queue()
 
     for record in records:
