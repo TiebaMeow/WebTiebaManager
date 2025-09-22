@@ -68,7 +68,7 @@ class Controller:
             return
 
         old_config = cls.config
-        cls._config = new_config
+        cls.config = new_config
         write_config(new_config, SYSTEM_CONFIG_PATH)
         await cls.SystemConfigChange.broadcast(UpdateEventData(old=old_config, new=new_config))
         system_logger.info("系统配置已更改")
