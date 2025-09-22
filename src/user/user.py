@@ -6,26 +6,25 @@ from typing import TYPE_CHECKING, Literal
 
 import aiotieba
 
-from src.config import write_config
-from src.constance import USER_DIR
-from src.control import Controller
-from src.process.process import Processer
-from src.process.typedef import ProcessObject
+from src.core.constants import USER_DIR
+from src.core.controller import Controller
+from src.process import Processer
 from src.rule.operation import OperationGroup
+from src.schemas.process import ProcessObject
+from src.schemas.user import ConfirmData
 from src.tieba.info import TiebaInfo
-from src.util.logging import LogRecorder, logger
-from src.util.tools import int_time
-
-from .confirm import ConfirmCache, ConfirmData
+from src.utils.cache import ExpireCache
+from src.utils.config import write_config
+from src.utils.logging import LogRecorder, logger
+from src.utils.tools import int_time
 
 if TYPE_CHECKING:
     from loguru import Logger
 
+    from src.core.config import UserConfig
     from src.rule.rule_set import RuleSet
-    from src.typedef import Content
-    from src.util.event import EventListener
-
-    from .config import UserConfig
+    from src.schemas.tieba import Content
+    from src.utils.event import EventListener
 
 
 class TiebaClientStatus(Enum):
@@ -149,7 +148,7 @@ class User:
             self.dir.mkdir(parents=True)
 
         self.processer = Processer(config)
-        self.confirm = ConfirmCache(self.dir, expire_time=self.config.process.confirm_expire)
+        self.confirm = ExpireCache[ConfirmData](self.dir / "confirm", expire_time=self.config.process.confirm_expire)
         self.logger = logger.bind(name=f"user.{self.config.user.username}")
         self.client: TiebaClient = TiebaClient(self.logger)
         self.valid = False

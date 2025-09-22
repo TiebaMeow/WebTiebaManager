@@ -3,12 +3,12 @@ from __future__ import annotations
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from src.config import ServerConfig, SystemConfig
-from src.control import Controller
-from src.user.config import UserConfig, UserInfo
+from src.core.config import ServerConfig, SystemConfig, UserConfig
+from src.core.controller import Controller
+from src.schemas.user import UserInfo
 from src.user.manager import UserManager
-from src.util.logging import system_logger
-from src.util.tools import validate_password
+from src.utils.logging import system_logger
+from src.utils.tools import validate_password
 
 from ..server import BaseResponse, Server, app
 

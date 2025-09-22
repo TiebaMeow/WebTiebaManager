@@ -36,8 +36,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import src.db.interface as dbi
-from src.db.config import DatabaseConfig
-from src.db.models import ContentModel
+from src.core.config import DatabaseConfig
+from src.models import ContentModel
 
 Database = dbi.Database
 

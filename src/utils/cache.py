@@ -5,7 +5,7 @@ from apscheduler.triggers.cron import CronTrigger
 from cashews import Cache
 from cashews.backends.interface import NOT_EXIST, UNLIMITED
 
-from src.control import Controller
+from src.core.controller import Controller
 
 from .event import AsyncEvent
 
@@ -55,11 +55,6 @@ class CacheCleaner:
         if Controller.config.cleanup_time != cls._clear_cache_time:
             cls._clear_cache_time = Controller.config.cleanup_time
             cls.setup_job()
-
-
-Controller.Start.on(CacheCleaner.start)
-Controller.Stop.on(CacheCleaner.stop)
-Controller.SystemConfigChange.on(CacheCleaner.update_clear_cache_time)
 
 
 class ExpireCache[T]:

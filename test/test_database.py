@@ -7,8 +7,9 @@ from zoneinfo import ZoneInfo
 import pytest
 import pytest_asyncio
 
-from src.db.config import DatabaseConfig
-from src.db.models import ContentModel, Image
+from src.core.config import DatabaseConfig
+from src.models import ContentModel
+from src.schemas.tieba import Image
 
 # 注入一个最小化的 src.control 以避免导入时的循环依赖
 module = types.ModuleType("src.control")
@@ -140,7 +141,7 @@ async def test_upsert_with_exclude_all_nonpk_no_update(setup_db):
 
 
 def test_mixed_model_raise_type_error():
-    from src.db.models import ForumModel
+    from src.models import ForumModel
 
     f = ForumModel(fname="f", fid=1)
     c = make_content(999)
@@ -245,13 +246,13 @@ async def test_iter_all_and_delete(setup_db):
 
 @pytest.mark.asyncio
 async def test_is_updated_post_and_comment(setup_db):
-    import src.typedef as typedef
+    import src.schemas.tieba as tieba
 
     now_ts = int(datetime.now(SH_TZ).timestamp())
-    user = typedef.User(user_name="u", nick_name="n", user_id=98765, portrait="p", level=1)
+    user = tieba.User(user_name="u", nick_name="n", user_id=98765, portrait="p", level=1)
 
     # 1) Post
-    post_new = typedef.Post(
+    post_new = tieba.Post(
         fname="f1",
         title="t1",
         text="x",
@@ -268,7 +269,7 @@ async def test_is_updated_post_and_comment(setup_db):
     assert st1 & dbi.UpdateStatus.IS_NEW
     assert st1 & dbi.UpdateStatus.IS_STABLE
 
-    post_new_child = typedef.Post(
+    post_new_child = tieba.Post(
         fname="f1",
         title="t1",
         text="x",
@@ -297,7 +298,7 @@ async def test_is_updated_post_and_comment(setup_db):
     assert st4 & dbi.UpdateStatus.IS_STABLE
 
     # 2) Comment
-    comment_new = typedef.Comment(
+    comment_new = tieba.Comment(
         fname="f2",
         title="t2",
         text="c",

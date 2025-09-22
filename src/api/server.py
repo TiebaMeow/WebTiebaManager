@@ -6,14 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.constance import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
-from src.control import Controller
-from src.tieba import crawler
+from src.core.config import ServerConfig
+from src.core.constants import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
+from src.core.controller import Controller
+from src.core.initialize import initialize
 from src.user.manager import UserManager
-from src.util.logging import exception_logger, system_logger
-from src.util.tools import random_str
-
-from .config import ServerConfig
+from src.utils.logging import exception_logger, system_logger
+from src.utils.tools import random_str
 
 HTTP_ALLOW_ORIGINS = ["*" if DEV else MAIN_SERVER]
 
@@ -28,6 +27,11 @@ def initialize_server_config():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # why initialize here?
+    # if __name__ == "__main__": 中的initialize()不会在uvicorn 每次reload时调用
+    # 在此调用以保证所有模式下都能正确初始化
+    initialize()
+
     await Controller.start()
     if Server.need_initialize():
         system_logger.warning(f"初始化密钥: {Server.secure_key()}")
@@ -130,7 +134,7 @@ class Server:
     @classmethod
     def dev_run(cls, config: ServerConfig):
         uvicorn.run(
-            "src.server.server:app", host=config.host, port=config.port, log_level="info", access_log=True, reload=True
+            "src.api.server:app", host=config.host, port=config.port, log_level="info", access_log=True, reload=True
         )
 
     @classmethod

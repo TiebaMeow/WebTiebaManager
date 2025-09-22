@@ -8,15 +8,10 @@ import aiofiles
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.util.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
+from src.utils.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
 
-from ..server import (
-    BaseResponse,
-    app,
-    current_user_depends,
-    ensure_system_access_depends,
-    parse_token,
-)
+from ..auth import current_user_depends, ensure_system_access_depends, parse_token
+from ..server import BaseResponse, app
 
 if TYPE_CHECKING:
     from loguru import Message

@@ -3,22 +3,23 @@ from __future__ import annotations
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from src.config import SystemConfig  # noqa: TC001
-from src.constance import BASE_DIR, CODE_EXPIRE
-from src.control import Controller
-from src.db.config import DatabaseConfig  # noqa: TC001
-from src.db.interface import Database
-from src.server import BaseResponse, app, ensure_system_access_depends, ip_depends
-from src.user.config import (
+from src.core.config import (
+    DatabaseConfig,
     ForumConfig,
+    SystemConfig,
     UserConfig,
-    UserInfo,
-    UserPermission,  # noqa: TC001
 )
+from src.core.constants import BASE_DIR, CODE_EXPIRE
+from src.core.controller import Controller
+from src.db import Database
+from src.schemas.user import UserInfo, UserPermission
 from src.user.manager import UserManager
-from src.util.cache import ClearCache, ExpireCache
-from src.util.logging import system_logger
-from src.util.tools import random_str, validate_password
+from src.utils.cache import ClearCache, ExpireCache
+from src.utils.logging import system_logger
+from src.utils.tools import random_str, validate_password
+
+from ..auth import ensure_system_access_depends, ip_depends  # noqa: TC001
+from ..server import BaseResponse, app
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")

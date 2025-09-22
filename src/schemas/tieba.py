@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
 from aiotieba.api.get_posts._classdef import FragImage_p
@@ -9,6 +10,32 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     import aiotieba.typing
+
+
+class QrcodeStatus(Enum):
+    WAITING = "WAITING"  # 等待扫码
+    SCANNED = "SCANNED"  # 已扫码，等待确认
+    EXPIRED = "EXPIRED"  # 二维码过期
+    FAILED = "FAILED"  # 登录失败
+    SUCCESS = "SUCCESS"  # 登录成功
+
+
+class QrcodeData(BaseModel):
+    imgurl: str = ""
+    errno: int
+    sign: str = ""
+    prompt: str = ""
+
+
+class AccountInfo(BaseModel):
+    bduss: str
+    stoken: str
+    user_name: str
+
+
+class QrcodeStatusData(BaseModel):
+    status: QrcodeStatus
+    account: AccountInfo | None = None
 
 
 class User(BaseModel):
@@ -206,8 +233,3 @@ class Comment(BaseContent, ContentInterface):
 
 
 Content = Thread | Post | Comment
-
-
-class UpdateEventData[T](BaseModel):
-    old: T
-    new: T

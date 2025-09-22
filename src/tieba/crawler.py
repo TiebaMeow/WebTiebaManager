@@ -8,20 +8,21 @@ from zoneinfo import ZoneInfo
 import aiotieba
 from pydantic import BaseModel
 
-from src.constance import PID_CACHE_EXPIRE
-from src.control import Controller
-from src.db.interface import ContentModel, Database, UpdateStatus
-from src.typedef import Comment, Post, Thread
+from src.core.constants import PID_CACHE_EXPIRE
+from src.core.controller import Controller
+from src.db import Database, UpdateStatus
+from src.models import ContentModel
+from src.schemas.tieba import Comment, Post, Thread
 from src.user.manager import UserManager
-from src.util.cache import ClearCache
-from src.util.logging import exception_logger, system_logger
-from src.util.tools import EtaSleep, Timer
+from src.utils.cache import ClearCache
+from src.utils.logging import exception_logger, system_logger
+from src.utils.tools import EtaSleep, Timer
 
 from .browser import TiebaBrowser
 
 if TYPE_CHECKING:
-    from src.config import SystemConfig
-    from src.typedef import UpdateEventData
+    from src.core.config import SystemConfig
+    from src.schemas.event import UpdateEventData
 
 
 @ClearCache.on
@@ -185,7 +186,7 @@ class Spider:
 
 
 class Crawler:
-    spider = Spider()
+    spider: Spider | None = None
     needs: dict[str, CrawlNeed] = {}
     task: asyncio.Task | None = None
 
@@ -261,18 +262,18 @@ class Crawler:
         while True:
             with exception_logger("爬虫循环异常"):
                 for forum, need in cls.needs.items():
-                    async for content in cls.spider.crawl(forum, need):
+                    async for content in cls.get_spider().crawl(forum, need):
                         system_logger.debug(f"爬取到新内容 {content.mark} 来自 {forum}")
                         await Database.save_items([ContentModel.from_content(content)])
                         await Controller.DispatchContent.broadcast(content)
             await asyncio.sleep(Controller.config.scan.loop_cd)
 
     @classmethod
+    def get_spider(cls) -> Spider:
+        if not cls.spider:
+            cls.spider = Spider()
+        return cls.spider
+
+    @classmethod
     async def start(cls):
-        await cls.spider.init_client()
-
-
-UserManager.UserChange.on(Crawler.update_needs)
-UserManager.UserConfigChange.on(Crawler.update_needs)
-Controller.SystemConfigChange.on(Crawler.restart)
-Controller.Stop.on(Crawler.start_or_stop)
+        await cls.get_spider().init_client()

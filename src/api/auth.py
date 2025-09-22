@@ -16,9 +16,9 @@ from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 
-from src.control import Controller
+from src.core.controller import Controller
 from src.user.manager import User, UserManager
-from src.util.logging import system_logger
+from src.utils.logging import system_logger
 
 from .encryt import encrypt
 from .server import app

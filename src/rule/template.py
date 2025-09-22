@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from .rule import RuleTemplate
 
 if TYPE_CHECKING:
-    from src.process.typedef import ProcessObject
+    from src.schemas.process import ProcessObject
 
 
 class ContentRuleTemplate(abc.ABC):
