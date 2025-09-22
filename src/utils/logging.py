@@ -7,10 +7,12 @@ import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
+from src.core.constants import BASE_DIR, DEBUG, DEV
+
+os.environ["LOGURU_DIAGNOSE"] = os.getenv("LOGURU_DIAGNOSE", str(DEBUG))
+
 from aiotieba.logging import set_formatter
 from loguru import logger
-
-from src.core.constants import BASE_DIR, DEBUG, DEV
 
 from .event import AsyncEvent
 
