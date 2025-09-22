@@ -7,17 +7,18 @@ import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
-from src.core.constants import BASE_DIR, DEBUG, DEV
-
-os.environ["LOGURU_DIAGNOSE"] = os.getenv("LOGURU_DIAGNOSE", str(DEBUG))
-
 from aiotieba.logging import set_formatter
 from loguru import logger
+
+from src.core.constants import BASE_DIR, DEBUG, DEV
 
 from .event import AsyncEvent
 
 if TYPE_CHECKING:
     from loguru import Message, Record
+
+
+LOGURU_DIAGNOSE = os.getenv("LOGURU_DIAGNOSE", "false").lower() == "true" or DEBUG
 
 set_formatter(
     logging.Formatter("{asctime} [{levelname}] | aiotieba.{funcName} | {message}", "%Y-%m-%d %H:%M:%S", style="{")
@@ -83,9 +84,9 @@ logger.remove()
 # 自定义格式
 log_format = "{time:YYYY-MM-DD HH:mm:ss} [{level}] | {extra[name]} | {message}"
 
-logger.add(try_broadcast_log, format=log_format, level=LOG_LEVEL)
+logger.add(try_broadcast_log, format=log_format, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
 
-logger.add(LogRecorder.sink, format=log_format, level=LOG_LEVEL)
+logger.add(LogRecorder.sink, format=log_format, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
 
 
 # 只在开发模式或调试模式下输出所有日志，否则只输出 system 日志和错误以上级别的日志
@@ -95,7 +96,7 @@ def console_filter(record: Record):
     return record["extra"].get("name") == "system" or record["level"].no >= logger.level("ERROR").no
 
 
-logger.add(sys.stdout, format=log_format, filter=console_filter, level=LOG_LEVEL)
+logger.add(sys.stdout, format=log_format, filter=console_filter, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
 
 # 修改文件处理器：输出到 logos 文件夹下
 logger.add(
@@ -104,6 +105,7 @@ logger.add(
     rotation="00:00",
     retention="1 month",
     level=LOG_LEVEL,
+    diagnose=LOGURU_DIAGNOSE,
 )
 
 logger.add(
@@ -113,6 +115,7 @@ logger.add(
     retention="1 month",
     level=LOG_LEVEL,
     serialize=True,
+    diagnose=LOGURU_DIAGNOSE,
 )
 
 LogRecorder.add("system")
