@@ -20,11 +20,15 @@ class Controller:
     DispatchContent = AsyncEvent[Content]()
     SystemConfigChange: AsyncEvent[UpdateEventData[SystemConfig]] = AsyncEvent()
     config: SystemConfig
+    initialized: bool = False
 
     running: bool = False
 
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> bool:
+        if cls.initialized:
+            return False
+
         """
         在所有包导入后调用，预加载配置
         """
@@ -36,6 +40,9 @@ class Controller:
 
         if not getattr(cls, "config", None):
             cls.config = read_config(SYSTEM_CONFIG_PATH, SystemConfig)
+
+        cls.initialized = True
+        return True
 
     @classmethod
     async def start(cls):
