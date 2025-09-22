@@ -7,14 +7,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.config import ServerConfig
-from src.core.constants import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
+from src.core.constants import DEV, DEV_WEBUI, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
 from src.core.controller import Controller
 from src.core.initialize import initialize
 from src.user.manager import UserManager
 from src.utils.logging import exception_logger, system_logger
 from src.utils.tools import random_str
 
-HTTP_ALLOW_ORIGINS = ["*" if DEV else MAIN_SERVER]
+HTTP_ALLOW_ORIGINS = ["*" if DEV_WEBUI else MAIN_SERVER]
 
 
 def initialize_server_config():
