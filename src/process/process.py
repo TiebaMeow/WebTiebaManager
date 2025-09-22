@@ -1,7 +1,12 @@
-from src.rule.rule_set import RuleSet
-from src.user.config import UserConfig
+from __future__ import annotations
 
-from .typedef import ProcessObject
+from typing import TYPE_CHECKING
+
+from src.rule.rule_set import RuleSet
+
+if TYPE_CHECKING:
+    from src.core.config import UserConfig
+    from src.schemas.process import ProcessObject
 
 
 class Processer:

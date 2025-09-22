@@ -6,13 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.constance import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
-from src.control import Controller
+from src.core.config import ServerConfig
+from src.core.constants import DEV, MAIN_SERVER, PUBLIC, SYSTEM_CONFIG_PATH
+from src.core.controller import Controller
 from src.user.manager import UserManager
-from src.util.logging import exception_logger, system_logger
-from src.util.tools import random_str
-
-from .config import ServerConfig
+from src.utils.logging import exception_logger, system_logger
+from src.utils.tools import random_str
 
 HTTP_ALLOW_ORIGINS = ["*" if DEV else MAIN_SERVER]
 

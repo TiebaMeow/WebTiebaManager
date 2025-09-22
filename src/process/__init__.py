@@ -1,1 +1,3 @@
-from .process import Processer, ProcessObject
+from .process import Processer
+
+__all__ = ["Processer"]

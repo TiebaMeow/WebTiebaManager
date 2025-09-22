@@ -8,20 +8,21 @@ from zoneinfo import ZoneInfo
 import aiotieba
 from pydantic import BaseModel
 
-from src.constance import PID_CACHE_EXPIRE
-from src.control import Controller
-from src.db import ContentModel, Database, UpdateStatus
-from src.typedef import Comment, Post, Thread
+from src.core.constants import PID_CACHE_EXPIRE
+from src.core.controller import Controller
+from src.db import Database, UpdateStatus
+from src.models import ContentModel
+from src.schemas.tieba import Comment, Post, Thread
 from src.user.manager import UserManager
-from src.util.cache import ClearCache
-from src.util.logging import exception_logger, system_logger
-from src.util.tools import EtaSleep, Timer
+from src.utils.cache import ClearCache
+from src.utils.logging import exception_logger, system_logger
+from src.utils.tools import EtaSleep, Timer
 
 from .browser import TiebaBrowser
 
 if TYPE_CHECKING:
-    from src.config import SystemConfig
-    from src.typedef import UpdateEventData
+    from src.core.config import SystemConfig
+    from src.schemas.event import UpdateEventData
 
 
 @ClearCache.on
@@ -276,9 +277,3 @@ class Crawler:
     @classmethod
     async def start(cls):
         await cls.get_spider().init_client()
-
-
-UserManager.UserChange.on(Crawler.update_needs)
-UserManager.UserConfigChange.on(Crawler.update_needs)
-Controller.SystemConfigChange.on(Crawler.restart)
-Controller.Stop.on(Crawler.start_or_stop)

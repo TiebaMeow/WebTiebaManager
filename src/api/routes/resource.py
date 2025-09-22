@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal
 import cv2
 from fastapi.responses import StreamingResponse
 
-from src.util.anonymous import AnonymousAiotieba
+from src.utils.anonymous import AnonymousAiotieba
 
 from ..server import app
 

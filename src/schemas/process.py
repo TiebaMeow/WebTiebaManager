@@ -1,4 +1,9 @@
-from ..typedef import Content
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .tieba import Content
 
 
 class ProcessObject[T]:

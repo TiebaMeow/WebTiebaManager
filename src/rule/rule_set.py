@@ -2,23 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
-
+from src.core.config import RuleSetConfig
 from src.rule.rule import RuleGroup, Rules
 
-from .operation import STR_OPERATION, OperationGroup, Operations
+from .operation import OperationGroup, Operations
 
 if TYPE_CHECKING:
-    from src.process import ProcessObject
-
-
-class RuleSetConfig(BaseModel):
-    name: str
-    manual_confirm: bool = False
-    operations: STR_OPERATION | list[dict]
-    rules: list[dict] = Field(default_factory=list)
-    last_modify: int = 0
-    whitelist: bool = False
+    from src.schemas.process import ProcessObject
 
 
 class RuleSet:

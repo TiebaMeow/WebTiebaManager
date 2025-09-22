@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, NamedTuple
 from aiotieba.logging import set_formatter
 from loguru import logger
 
-from src.constance import BASE_DIR, DEBUG, DEV
+from src.core.constants import BASE_DIR, DEBUG, DEV
 
 from .event import AsyncEvent
 

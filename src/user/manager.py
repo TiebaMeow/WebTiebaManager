@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import shutil
 
-from src.constance import USER_DIR
-from src.control import Controller
-from src.util.config import read_config, write_config
-from src.util.event import AsyncEvent
-from src.util.logging import system_logger
+from src.core.config import UserConfig
+from src.core.constants import USER_DIR
+from src.utils.config import read_config, write_config
+from src.utils.event import AsyncEvent
+from src.utils.logging import system_logger
 
-from .config import UserConfig
 from .user import User
 
 
@@ -146,7 +145,3 @@ class UserManager:
     @classmethod
     async def disable_user(cls, username: str):
         return await cls.change_user_status(username, False)
-
-
-Controller.Start.on(UserManager.load_users)
-Controller.Stop.on(UserManager.clear_users)

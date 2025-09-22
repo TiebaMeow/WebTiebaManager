@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.util.config import read_config, write_config
-from src.util.logging import system_logger
+from src.schemas.event import UpdateEventData
+from src.schemas.tieba import Content
+from src.utils.config import read_config, write_config
+from src.utils.event import AsyncEvent
+from src.utils.logging import system_logger
 
-from .constance import SYSTEM_CONFIG_PATH
-from .typedef import Content, UpdateEventData
-from .util.anonymous import stop_anonymous_clients
-from .util.event import AsyncEvent
+from .constants import SYSTEM_CONFIG_PATH
 
 if TYPE_CHECKING:
     from .config import SystemConfig  # noqa: TC004
@@ -65,6 +65,3 @@ class Controller:
         write_config(new_config, SYSTEM_CONFIG_PATH)
         await cls.SystemConfigChange.broadcast(UpdateEventData(old=old_config, new=new_config))
         system_logger.info("系统配置已更改")
-
-
-Controller.Stop.on(stop_anonymous_clients)

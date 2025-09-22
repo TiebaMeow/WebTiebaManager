@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import time
@@ -7,10 +9,10 @@ import aiofiles
 import aiohttp
 from pydantic import BaseModel, Field
 
-from src.constance import BASE_DIR
-from src.typedef import Comment, Image, Post, User
-from src.util.logging import exception_logger, system_logger
-from src.util.tools import timestring
+from src.core.constants import BASE_DIR
+from src.schemas.tieba import Comment, Image, Post, User
+from src.utils.logging import exception_logger, system_logger
+from src.utils.tools import timestring
 
 
 class ResponseUser(TypedDict):

@@ -1,7 +1,7 @@
 import pytest
 
-from src.util.event import AsyncEvent, EventListener
-from src.util.logging import LogRecorder
+from src.utils.event import AsyncEvent, EventListener
+from src.utils.logging import LogRecorder
 
 
 @pytest.mark.asyncio

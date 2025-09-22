@@ -1,7 +1,7 @@
 """
 使用方法：
 
-from src.typedef import Content
+from src.schemas.tieba import Content
 from src.db import Database, ContentModel
 
 contents: list[Content]
@@ -25,19 +25,18 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from src.control import Controller
-from src.typedef import Comment, Post
-from src.util.logging import system_logger
-
-from .config import DatabaseConfig
-from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
+from src.core.config import DatabaseConfig
+from src.core.controller import Controller
+from src.models import Base, ContentModel, ForumModel, LifeModel, UserModel
+from src.schemas.tieba import Comment, Post
+from src.utils.logging import system_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from datetime import datetime
 
-    from src.config import SystemConfig
-    from src.typedef import UpdateEventData
+    from src.core.config import SystemConfig
+    from src.schemas.event import UpdateEventData
 
 MixedContentType = aiotieba.Thread | Post | Comment
 
@@ -288,8 +287,3 @@ class Database:
             result = await session.execute(delete(ContentModel).where(ContentModel.last_update < before))
             await session.commit()
             return result.rowcount or 0
-
-
-Controller.Start.on(Database.startup)
-Controller.Stop.on(Database.teardown)
-Controller.SystemConfigChange.on(Database.update_config)

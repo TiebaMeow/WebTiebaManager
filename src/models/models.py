@@ -9,10 +9,10 @@ from sqlalchemy import BIGINT, JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, foreign, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
-from ..typedef import Image
+from src.schemas.tieba import Image
 
 if TYPE_CHECKING:
-    from ..typedef import Content, User
+    from src.schemas.tieba import Content, User
 
 
 class Base(DeclarativeBase):
