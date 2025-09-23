@@ -6,7 +6,7 @@ from fastapi import Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.core.constants import MAIN_SERVER, PROGRAM_VERSION, RESOURCE_DIR, WEB_UI_VERSION
+from src.core.constants import DEV, MAIN_SERVER, PROGRAM_VERSION, RESOURCE_DIR, WEB_UI_VERSION
 from src.utils.anonymous import AnonymousAiohttp
 from src.utils.logging import system_logger
 from src.utils.tools import Timer
@@ -16,7 +16,8 @@ from ..server import Server, app
 WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_VERSION}"
 
 DOWNLOADABLE_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
-DOWNLOADING_RESOURCES = {}
+VALID_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
+downloading_resources = {}
 
 
 async def reverse_proxy(url: str, request: Request, raw=False):
@@ -35,8 +36,8 @@ async def reverse_proxy(url: str, request: Request, raw=False):
 
 
 async def download_resource(path: Path):
-    if path in DOWNLOADING_RESOURCES:
-        event = DOWNLOADING_RESOURCES[path]
+    if path in downloading_resources:
+        event = downloading_resources[path]
         await event.wait()
         if path.exists():
             async with aiofiles.open(path, "rb") as f:
@@ -47,7 +48,7 @@ async def download_resource(path: Path):
     url = f"{MAIN_SERVER}/webui/resources/{path.name}"
     session = await AnonymousAiohttp.session()
     event = asyncio.Event()
-    DOWNLOADING_RESOURCES[path] = event
+    downloading_resources[path] = event
 
     try:
         with Timer() as t:
@@ -66,7 +67,7 @@ async def download_resource(path: Path):
                 return data
     finally:
         event.set()
-        DOWNLOADING_RESOURCES.pop(path, None)
+        downloading_resources.pop(path, None)
 
 
 @app.get("/", tags=["webui"])
@@ -97,6 +98,9 @@ async def webui_info() -> ServerInfo:
 
 @app.get("/resources/{path:path}", tags=["webui"])
 async def resources(path: str, request: Request):
+    if path not in VALID_RESOURCES and not DEV:
+        return Response(status_code=403, content="Forbidden")
+
     if ".." in path or path.startswith("/") or Path(path).is_absolute():
         return Response(status_code=400, content="Bad Request")
 
