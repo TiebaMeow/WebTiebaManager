@@ -43,7 +43,7 @@ class IpCondition(TextCondition):
     priority: int = 45
 
     async def check(self, obj: ProcessObject) -> bool:
-        # 调用api获取ip
+        # 调用API获取ip
         user_info = await TiebaInfo.get_user_info(obj)
         return await self._raw_check(user_info.ip)
 
@@ -54,6 +54,6 @@ class TiebaUidCondition(TextCondition):
     priority: int = 45
 
     async def check(self, obj: ProcessObject) -> bool:
-        # 调用api获取贴吧号
+        # 调用API获取贴吧号
         user_info = await TiebaInfo.get_user_info(obj)
         return await self._raw_check(str(user_info.tieba_uid))
