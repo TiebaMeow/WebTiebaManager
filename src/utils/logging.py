@@ -33,7 +33,7 @@ class LogEventData(NamedTuple):
 LogEvent = AsyncEvent[LogEventData]()
 
 
-LOG_LEVEL = "DEBUG" if DEBUG else os.getenv("WEBTM_LOG_LEVEL", "INFO").upper()
+LOG_LEVEL = "DEBUG" if DEBUG else os.getenv("WTM_LOG_LEVEL", "INFO").upper()
 LOG_DIR = BASE_DIR / "logs"
 JSON_LOG_DIR = LOG_DIR / "json"
 

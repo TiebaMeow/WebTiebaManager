@@ -9,7 +9,7 @@ from src.core.config import (
     SystemConfig,
     UserConfig,
 )
-from src.core.constants import BASE_DIR, CODE_EXPIRE
+from src.core.constants import BASE_DIR, INVITE_CODE_EXPIRE
 from src.core.controller import Controller
 from src.db import Database
 from src.schemas.user import UserInfo, UserPermission
@@ -36,7 +36,7 @@ class UserInfodata(BaseModel):
     use: bool = False
 
 
-CodeCache = ExpireCache[UserInfodata](expire_time=CODE_EXPIRE, directory=BASE_DIR / "code")
+CodeCache = ExpireCache[UserInfodata](expire_time=INVITE_CODE_EXPIRE, directory=BASE_DIR / "code")
 
 
 @app.get("/api/system/get_users_info", tags=["system"])
