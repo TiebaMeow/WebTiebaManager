@@ -53,6 +53,8 @@ async def realtime_log(name: str, request: Request):
     for record in records:
         await queue.put(record)
 
+    await queue.put(None)  # 用于标记初始日志发送完毕
+
     async def log_listener(data: LogEventData):
         try:
             if data.name != name and name != "system":
@@ -70,6 +72,10 @@ async def realtime_log(name: str, request: Request):
         try:
             while True:
                 log = await queue.get()
+                if log is None:
+                    yield "data: [DONE]\n\n"
+                    continue
+
                 yield f"data: {json.dumps(log.model_dump(), ensure_ascii=False)}\n\n"
                 if await request.is_disconnected():
                     break
