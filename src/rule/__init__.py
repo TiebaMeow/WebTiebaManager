@@ -1,27 +1,27 @@
-from .content_rule import (
-    ContentTextRule,
-    ContentTypeRule,
-    CreateTimeRule,
-    FloorRule,
+from .content_condition import (
+    ContentTextCondition,
+    ContentTypeCondition,
+    CreateTimeCondition,
+    FloorCondition,
 )
-from .user_rule import (
-    IpRule,
-    LevelRule,
-    NickNameRule,
-    PortraitRule,
-    TiebaUidRUle,
-    UserNameRule,
+from .user_condition import (
+    IpCondition,
+    LevelCondition,
+    NickNameCondition,
+    PortraitCondition,
+    TiebaUidCondition,
+    UserNameCondition,
 )
 
 __all__ = [
-    "ContentTextRule",
-    "CreateTimeRule",
-    "FloorRule",
-    "ContentTypeRule",
-    "UserNameRule",
-    "NickNameRule",
-    "PortraitRule",
-    "LevelRule",
-    "IpRule",
-    "TiebaUidRUle",
+    "ContentTextCondition",
+    "CreateTimeCondition",
+    "FloorCondition",
+    "ContentTypeCondition",
+    "UserNameCondition",
+    "NickNameCondition",
+    "PortraitCondition",
+    "LevelCondition",
+    "IpCondition",
+    "TiebaUidCondition",
 ]

@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 
 
-class RuleInfo(BaseModel):
-    """规则信息
+class ConditionInfo(BaseModel):
+    """条件信息
 
     Attributes:
-        type (str): 类型，如UserNameRule、IpRule等
+        type (str): 类型，如UserNameCondition、IpCondition等
         name (str): 用户友善的名称
         category (str): 分类，如用户、帖子等
         description (str): 描述

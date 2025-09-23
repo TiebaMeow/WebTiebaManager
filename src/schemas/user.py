@@ -12,7 +12,7 @@ from .tieba import Content  # noqa: TC001 UserInfo用于Fastapi，禁止移入TY
 class ConfirmSimpleData(BaseModel):
     content: Content
     process_time: int
-    rule_set_name: str
+    rule_name: str
 
 
 class ConfirmData(ConfirmSimpleData):
@@ -21,7 +21,7 @@ class ConfirmData(ConfirmSimpleData):
 
     @property
     def simple(self) -> ConfirmSimpleData:
-        return ConfirmSimpleData(content=self.content, process_time=self.process_time, rule_set_name=self.rule_set_name)
+        return ConfirmSimpleData(content=self.content, process_time=self.process_time, rule_name=self.rule_name)
 
 
 class UserInfo(BaseModel):
@@ -40,4 +40,4 @@ class UserInfo(BaseModel):
 
 class UserPermission(BaseModel):
     can_edit_forum: bool = True  # 用户是否有权限编辑监控贴吧
-    can_edit_rule_set: bool = True  # 用户是否有权限编辑规则集
+    can_edit_rule: bool = True  # 用户是否有权限编辑规则

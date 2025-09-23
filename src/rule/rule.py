@@ -1,130 +1,43 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, TypeAdapter
+from src.core.config import RuleConfig
+from src.rule.condition import ConditionGroup, Conditions
 
-from src.schemas.rule import RuleInfo
+from .operation import OperationGroup, Operations
 
 if TYPE_CHECKING:
     from src.schemas.process import ProcessObject
 
 
-class RuleTemplate(BaseModel, ABC):
-    options: Any
-    priority: int = 50  # 优先级，默认50，从高到低检查
+class Rule:
+    def __init__(self, config: RuleConfig) -> None:
+        self.name: str = config.name
+        self.manual_confirm: bool = config.manual_confirm
+        self.last_modify: int = config.last_modify
+        self.whitelist: bool = config.whitelist
 
-    @abstractmethod
+        self.operations: OperationGroup = Operations.deserialize(config.operations)  # type: ignore
+        self.conditions: ConditionGroup = Conditions.deserialize(config.conditions)  # type: ignore
+
     async def check(self, obj: ProcessObject) -> bool:
-        raise NotImplementedError
+        for i in self.conditions:
+            if not await i.check(obj):
+                return False
 
-    @property
-    def valid(self) -> bool:
-        return self.options.valid
-
-
-class RuleGroup:
-    def __init__(self, rules: list[RuleTemplate]) -> None:
-        self.rules: list[RuleTemplate] = sorted((i for i in rules if i.valid), key=lambda x: x.priority, reverse=True)
-
-    def __iter__(self):
-        return iter(self.rules)
+        return True
 
     def serialize(self):
-        return [rule.model_dump() for rule in self.rules]
+        return RuleConfig(
+            name=self.name,
+            manual_confirm=self.manual_confirm,
+            last_modify=self.last_modify,
+            whitelist=self.whitelist,
+            operations=self.operations.serialize(),
+            conditions=self.conditions.serialize(),
+        )
 
     @property
     def valid(self):
-        return bool(len(self.rules))
-
-
-class Rules:
-    rule_classes = None  # 储存所有rule class，用于转化规则配置
-    rule_dict: dict[str, type[RuleTemplate]] = {}
-    rule_info: dict[str, RuleInfo] = {}
-
-    @classmethod
-    def register(
-        cls,
-        name: str,
-        category: str,
-        description: str = "无描述",
-        default_options: Any = None,
-        values: dict[str, str] | None = None,
-    ):
-        """
-        注册规则
-
-        Args:
-            name (str): 规则名称 如 "用户名"
-            category (str): 规则分类 如 "用户"
-            description (str): 规则描述 note 目前webui未使用此值
-            default_options (Any): 规则默认配置
-            values (dict[str, str] | None): 用于CheckBox/Select，提供给网页端信息 {原键: 用户友好名称}
-        """
-
-        def wrapper(rule: type[RuleTemplate]):
-            nonlocal default_options
-
-            if cls.rule_classes is None:
-                cls.rule_classes = rule
-            else:
-                cls.rule_classes |= rule
-
-            if default_options is None:
-                default_options = {}
-
-            if values:
-                default_rule = rule(options={"values": list(values.keys()), "value": list(values.keys())[0]})
-            else:
-                default_rule = rule(options=default_options)
-            try:
-                rule_type = default_rule.type  # type: ignore
-            except AttributeError as e:
-                raise Exception("规则类型未定义") from e
-
-            cls.rule_dict[rule_type] = rule  # type: ignore
-            cls.rule_info[rule_type] = RuleInfo(
-                type=rule_type,
-                name=name,
-                category=category,
-                description=description,
-                series=getattr(default_rule, "_series", "custom"),
-                values=values,
-            )
-
-            return rule
-
-        return wrapper
-
-    @classmethod
-    def fix_category(cls, category: str):
-        """
-        固定分类
-
-        Args:
-            category (str): 规则分类 如 "用户"
-
-        Returns:
-            Callable: 装饰器 Rules.register，移除了category参数
-        """
-
-        def _(
-            name: str, description: str = "无描述", default_options: Any = None, values: dict[str, str] | None = None
-        ):
-            return cls.register(name, category, description=description, default_options=default_options, values=values)
-
-        return _
-
-    @classmethod
-    def deserialize_rule(cls, rule_config: RuleTemplate) -> RuleTemplate:
-        return cls.rule_classes.model_validate(rule_config)  # type: ignore
-
-    @classmethod
-    def deserialize(cls, rule_config: list[RuleTemplate]) -> RuleGroup:
-        if cls.rule_classes:
-            adapter = TypeAdapter(cls.rule_classes)
-            return RuleGroup([adapter.validate_python(i) for i in rule_config])
-        else:
-            raise Exception("无有效规则，无法初始化")
+        return self.conditions.valid

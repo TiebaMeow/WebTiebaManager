@@ -99,18 +99,18 @@ class ForumConfig(BaseModel):
 STR_OPERATION = Literal["ignore", "delete", "block", "delete_and_block"]
 
 
-class RuleSetConfig(BaseModel):
+class RuleConfig(BaseModel):
     name: str
     manual_confirm: bool = False
     operations: STR_OPERATION | list[dict]
-    rules: list[dict] = Field(default_factory=list)
+    conditions: list[dict] = Field(default_factory=list)
     last_modify: int = 0
     whitelist: bool = False
 
 
 class UserConfig(BaseModel):
     user: UserInfo
-    rule_sets: list[RuleSetConfig] = Field(default_factory=list)
+    rules: list[RuleConfig] = Field(default_factory=list)
     forum: ForumConfig = Field(default_factory=ForumConfig)
     process: ProcessConfig = Field(default_factory=ProcessConfig)
     enable: bool = True

@@ -5,9 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from src.core.config import ForumConfig, ProcessConfig, RuleSetConfig  # noqa: TC001
-from src.rule.rule import Rules
-from src.schemas.rule import RuleInfo  # noqa: TC001
+from src.core.config import ForumConfig, ProcessConfig, RuleConfig  # noqa: TC001
+from src.rule.condition import Conditions
+from src.schemas.rule import ConditionInfo  # noqa: TC001
 
 # 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
 from src.schemas.user import ConfirmSimpleData, UserPermission  # noqa: TC001
@@ -106,21 +106,21 @@ async def set_user_config(
 
 
 @app.get("/api/rule/info", tags=["rule"])
-async def get_rule_info(user: current_user_depends) -> BaseResponse[list[RuleInfo]]:
-    return BaseResponse(data=list(Rules.rule_info.values()))
+async def get_condition_info(user: current_user_depends) -> BaseResponse[list[ConditionInfo]]:
+    return BaseResponse(data=list(Conditions.condition_info.values()))
 
 
 @app.get("/api/rule/get", tags=["rule"])
-async def get_rule_sets(user: current_user_depends) -> BaseResponse[list[RuleSetConfig]]:
-    return BaseResponse(data=user.config.rule_sets)
+async def get_rules(user: current_user_depends) -> BaseResponse[list[RuleConfig]]:
+    return BaseResponse(data=user.config.rules)
 
 
 @app.post("/api/rule/set", tags=["rule"])
-async def set_rule_sets(
-    user: current_user_depends, system_access: system_access_depends, rule_sets: list[RuleSetConfig]
+async def set_rules(
+    user: current_user_depends, system_access: system_access_depends, rules: list[RuleConfig]
 ) -> BaseResponse[bool]:
     config = user.config.model_copy(deep=True)
-    config.rule_sets = rule_sets
+    config.rules = rules
     try:
         await UserManager.update_config(config, system_access=system_access)
     except PermissionError as e:

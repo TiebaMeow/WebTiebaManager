@@ -195,7 +195,7 @@ class Crawler:
         new_needs: dict[str, CrawlNeed] = {}
         for user in UserManager.users.values():
             forum = user.config.forum
-            if user.enable and forum and user.config.rule_sets and forum.fname:
+            if user.enable and forum and user.config.rules and forum.fname:
                 need = CrawlNeed(thread=forum.thread, post=forum.post, comment=forum.comment)
                 new_needs[forum.fname] = new_needs.get(forum.fname, CrawlNeed.empty()) + need
 
