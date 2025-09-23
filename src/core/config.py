@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import quote_plus
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, computed_field, field_validator
 
 from src.schemas.user import UserInfo, UserPermission
 from src.utils.tools import Mosaic, get_listenable_addresses, int_time, random_secret, random_str, validate_password
@@ -103,14 +103,18 @@ class RuleConfig(BaseModel):
     name: str
     manual_confirm: bool = False
     operations: STR_OPERATION | list[dict]
-    conditions: list[dict] = Field(default_factory=list)
+    # 兼容旧配置
+    # TODO v1.0.0+ 移除
+    conditions: list[dict] = Field(default_factory=list, validation_alias=AliasChoices("conditions", "rules"))
     last_modify: int = 0
     whitelist: bool = False
 
 
 class UserConfig(BaseModel):
     user: UserInfo
-    rules: list[RuleConfig] = Field(default_factory=list)
+    # 兼容旧配置
+    # TODO v1.0.0+ 移除
+    rules: list[RuleConfig] = Field(default_factory=list, validation_alias=AliasChoices("rules", "rule_sets"))
     forum: ForumConfig = Field(default_factory=ForumConfig)
     process: ProcessConfig = Field(default_factory=ProcessConfig)
     enable: bool = True

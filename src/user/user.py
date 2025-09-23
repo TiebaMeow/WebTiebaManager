@@ -138,6 +138,17 @@ class TiebaClient:
         return True
 
 
+class ConfirmCache(ExpireCache[ConfirmData]):
+    # 兼容旧数据
+    # TODO v1.0.0+ 移除
+    @staticmethod
+    def deserialize_data(data: ConfirmData) -> ConfirmData:
+        if hasattr(data, "rule_name"):
+            return data
+
+        return data.model_copy(update={"rule_name": getattr(data, "rule_set_name", "未知(版本更新丢失)")})
+
+
 class User:
     CONFIG_FILE = "config.yaml"
 
@@ -152,7 +163,7 @@ class User:
             self.dir.mkdir(parents=True)
 
         self.processer = Processer(config)
-        self.confirm = ExpireCache[ConfirmData](self.dir / "confirm", expire_time=self.config.process.confirm_expire)
+        self.confirm = ConfirmCache(self.dir / "confirm", expire_time=self.config.process.confirm_expire)
         self.logger = logger.bind(name=f"user.{self.config.user.username}")
         self.client: TiebaClient = TiebaClient(self.logger)
         self.valid = False
