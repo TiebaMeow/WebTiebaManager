@@ -1,21 +1,28 @@
+import asyncio
 from pathlib import Path
 
+import aiofiles
 from fastapi import Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from src.core.constants import MAIN_SERVER, PROGRAM_VERSION, RESOURCE_DIR, WEB_UI_VERSION
 from src.utils.anonymous import AnonymousAiohttp
+from src.utils.logging import system_logger
+from src.utils.tools import Timer
 
 from ..server import Server, app
 
 WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_VERSION}"
 
+DOWNLOADABLE_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
+DOWNLOADING_RESOURCES = {}
+
 
 async def reverse_proxy(url: str, request: Request, raw=False):
-    client = await AnonymousAiohttp.session()
+    session = await AnonymousAiohttp.session()
     headers = {key: value for key, value in request.headers.items() if key != "host"}
-    async with client.get(url, headers=headers) as resp:
+    async with session.get(url, headers=headers) as resp:
         data = await resp.read()
         headers = dict(resp.headers)
 
@@ -25,6 +32,41 @@ async def reverse_proxy(url: str, request: Request, raw=False):
         for h in ["Transfer-Encoding", "Content-Encoding", "Server", "Date"]:
             headers.pop(h, None)
         return data, resp.status, headers
+
+
+async def download_resource(path: Path):
+    if path in DOWNLOADING_RESOURCES:
+        event = DOWNLOADING_RESOURCES[path]
+        await event.wait()
+        if path.exists():
+            async with aiofiles.open(path, "rb") as f:
+                return await f.read()
+        return None
+
+    system_logger.info(f"正在下载资源文件: {path.name}")
+    url = f"{MAIN_SERVER}/webui/resources/{path.name}"
+    session = await AnonymousAiohttp.session()
+    event = asyncio.Event()
+    DOWNLOADING_RESOURCES[path] = event
+
+    try:
+        with Timer() as t:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    system_logger.error(f"资源文件下载失败: {path.name} (HTTP {resp.status})")
+                    return None
+                data = await resp.read()
+
+                path.parent.mkdir(parents=True, exist_ok=True)
+
+                async with aiofiles.open(path, "wb") as f:
+                    await f.write(data)
+
+                system_logger.info(f"资源文件下载完成: {path.name} ({t.elapsed:.2f}s)")
+                return data
+    finally:
+        event.set()
+        DOWNLOADING_RESOURCES.pop(path, None)
 
 
 @app.get("/", tags=["webui"])
@@ -64,6 +106,12 @@ async def resources(path: str, request: Request):
         return Response(status_code=400, content="Bad Request")
 
     if not file_path.exists() or not file_path.is_file():
+        if path in DOWNLOADABLE_RESOURCES:
+            data = await download_resource(file_path)
+            if data is None:
+                return Response(status_code=404, content="Not Found")
+            return Response(content=data, media_type="application/octet-stream")
+
         return Response(status_code=404, content="Not Found")
 
     return FileResponse(file_path)
