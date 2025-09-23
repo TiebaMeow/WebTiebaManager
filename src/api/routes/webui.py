@@ -6,14 +6,14 @@ from fastapi import Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.core.constants import DEV, MAIN_SERVER, PROGRAM_VERSION, RESOURCE_DIR, WEB_UI_VERSION
+from src.core.constants import DEV, MAIN_SERVER, PROGRAM_VERSION, RESOURCE_DIR, WEB_UI_CODE
 from src.utils.anonymous import AnonymousAiohttp
 from src.utils.logging import system_logger
 from src.utils.tools import Timer
 
 from ..server import Server, app
 
-WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_VERSION}"
+WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_CODE}"
 
 DOWNLOADABLE_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
 VALID_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
