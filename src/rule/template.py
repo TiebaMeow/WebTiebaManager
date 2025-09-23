@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from .rule import RuleTemplate
+from .condition import ConditionTemplate
 
 if TYPE_CHECKING:
     from src.schemas.process import ProcessObject
 
 
-class ContentRuleTemplate(abc.ABC):
+class ContentConditionTemplate(abc.ABC):
     _target_attribute: str | list[str]
 
     @abc.abstractmethod
@@ -47,7 +47,7 @@ class TextOptions(BaseModel):
             self._text = self.text.lower() if self.ignore_case else self.text
 
 
-class TextRule(ContentRuleTemplate, RuleTemplate):
+class TextCondition(ContentConditionTemplate, ConditionTemplate):
     _series = "text"
     options: TextOptions
 
@@ -84,7 +84,7 @@ class LimiterOptions(BaseModel):
             return self.min is not None
 
 
-class LimiterRule(ContentRuleTemplate, RuleTemplate):
+class LimiterCondition(ContentConditionTemplate, ConditionTemplate):
     _series = "limiter"
     options: LimiterOptions
 
@@ -120,7 +120,7 @@ class TimeOptions(BaseModel):
             raise ValueError("时间规则格式错误，请检查配置文件") from e
 
 
-class TimeRule(ContentRuleTemplate, RuleTemplate):
+class TimeCondition(ContentConditionTemplate, ConditionTemplate):
     _series = "time"
     options: TimeOptions
 
@@ -145,7 +145,7 @@ class CheckBoxOptions[T](BaseModel):
         self._set = set(getattr(self, "values", []))
 
 
-class CheckBoxRule[T](ContentRuleTemplate, RuleTemplate):
+class CheckBoxCondition[T](ContentConditionTemplate, ConditionTemplate):
     _series = "checkbox"
     options: CheckBoxOptions[T]
 
@@ -161,7 +161,7 @@ class SelectOption[T](BaseModel):
         return bool(self.value)
 
 
-class SelectRule[T](ContentRuleTemplate, RuleTemplate):
+class SelectCondition[T](ContentConditionTemplate, ConditionTemplate):
     _series = "select"
     options: SelectOption[T]
 

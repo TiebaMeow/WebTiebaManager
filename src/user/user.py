@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from loguru import Logger
 
     from src.core.config import UserConfig
-    from src.rule.rule_set import RuleSet
+    from src.rule.rule import Rule
     from src.schemas.tieba import Content
     from src.utils.event import EventListener
 
@@ -211,8 +211,8 @@ class User:
             if new_config.forum.fname != old_config.forum.fname and not self.perm.can_edit_forum:
                 raise PermissionError("没有修改监控贴吧的权限")
 
-            if new_config.rule_sets != old_config.rule_sets and not self.perm.can_edit_rule_set:
-                raise PermissionError("没有修改规则集的权限")
+            if new_config.rules != old_config.rules and not self.perm.can_edit_rule:
+                raise PermissionError("没有修改规则的权限")
 
         self.config = new_config
 
@@ -243,16 +243,16 @@ class User:
 
     async def process(self, content: Content):
         obj = ProcessObject(content)
-        result_rule_set = await self.processer.process(obj)
-        if result_rule_set:
+        result_rule = await self.processer.process(obj)
+        if result_rule:
             self.logger.info(
-                f"{content.mark} 命中 {result_rule_set.name}",
+                f"{content.mark} 命中 {result_rule.name}",
                 tid=content.tid,
                 pid=content.pid,
                 uid=content.user.user_id,
                 portrait=content.user.portrait,
             )
-            await self.operate_rule_set(obj, result_rule_set)
+            await self.operate_rule(obj, result_rule)
 
     async def operate(self, obj: ProcessObject, og: OperationGroup):
         operations = og.operations
@@ -294,15 +294,15 @@ class User:
                 else:
                     self.logger.warning(f"未知操作：{operation.type}")
 
-    async def operate_rule_set(self, obj: ProcessObject, rule_set: RuleSet):
+    async def operate_rule(self, obj: ProcessObject, rule: Rule):
         """
         执行规则集的直接操作
         """
-        if self.config.process.mandatory_confirm or rule_set.manual_confirm:
-            if og := rule_set.operations.direct_operations:
+        if self.config.process.mandatory_confirm or rule.manual_confirm:
+            if og := rule.operations.direct_operations:
                 await self.operate(obj, og)
 
-            og = rule_set.operations.no_direct_operations
+            og = rule.operations.no_direct_operations
 
             if og:
                 data = {}
@@ -319,14 +319,14 @@ class User:
                         data=data,
                         operations=og.serialize(),
                         process_time=int_time(),
-                        rule_set_name=rule_set.name,
+                        rule_name=rule.name,
                     ),
                 )
 
                 self.logger.info(f"{obj.content.mark} 需要确认后才能继续操作", tid=obj.content.tid, pid=obj.content.pid)
 
         else:
-            await self.operate(obj, rule_set.operations)
+            await self.operate(obj, rule.operations)
 
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         if isinstance(confirm, (str, int)):
