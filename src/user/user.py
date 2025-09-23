@@ -307,7 +307,7 @@ class User:
 
     async def operate_rule(self, obj: ProcessObject, rule: Rule):
         """
-        执行规则集的直接操作
+        执行规则的直接操作
         """
         if self.config.process.mandatory_confirm or rule.manual_confirm:
             if og := rule.operations.direct_operations:
