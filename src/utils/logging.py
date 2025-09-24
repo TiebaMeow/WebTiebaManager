@@ -8,7 +8,10 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
 import aiotieba
+import colorama
+from colorama import Fore, Style
 from loguru import logger
+from uvicorn.config import LOGGING_CONFIG
 
 from src.core.constants import BASE_DIR, DEBUG, DEV
 
@@ -18,49 +21,59 @@ if TYPE_CHECKING:
     from loguru import Message, Record
 
 
+colorama.init(autoreset=True)
+
+
+LEVEL_COLOR = {
+    "INFO": Style.BRIGHT,
+    "DEBUG": Fore.BLUE + Style.BRIGHT,
+    "WARNING": Fore.YELLOW + Style.BRIGHT,
+    "ERROR": Fore.RED + Style.BRIGHT,
+    "CRITICAL": Fore.RED + Style.BRIGHT,
+}
+
+
 LOGURU_DIAGNOSE = os.getenv("LOGURU_DIAGNOSE", "false").lower() == "true" or DEBUG
 
 
+class ColorFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):  # noqa: N802
+        s = super().formatTime(record, datefmt)
+        return f"{Fore.GREEN}{s}{Style.RESET_ALL}"
+
+    def format(self, record):
+        log_level = record.levelname
+        if log_level in LEVEL_COLOR:
+            record.levelname = f"{LEVEL_COLOR[log_level]}{log_level}{Style.RESET_ALL}"
+        return super().format(record)
+
+
 def get_uvicorn_log_config(name: str) -> dict:
-    return {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "default": {
-                "()": "logging.Formatter",
-                "fmt": f"{{asctime}} [{{levelname}}] | {name} | {{message}}",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-                "style": "{",
-            },
-            "access": {
-                "()": "uvicorn.logging.AccessFormatter",
-                "fmt": f'{{asctime}} [{{levelname}}] | {name} | {{client_addr}} - "{{request_line}}" {{status_code}}',
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-                "style": "{",
-            },
+    config = LOGGING_CONFIG.copy()
+    config["formatters"] = {
+        "default": {
+            "()": "src.utils.logging.ColorFormatter",
+            "fmt": f"{{asctime}} [{{levelname}}] {Fore.CYAN}{name}{Fore.RESET} | {{message}}",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "style": "{",
         },
-        "handlers": {
-            "default": {
-                "formatter": "default",
-                "class": "logging.StreamHandler",
-                "stream": "ext://sys.stderr",
-            },
-            "access": {
-                "formatter": "access",
-                "class": "logging.StreamHandler",
-                "stream": "ext://sys.stdout",
-            },
-        },
-        "loggers": {
-            "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
-            "uvicorn.error": {"level": "INFO"},
-            "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+        "access": {
+            "()": "uvicorn.logging.AccessFormatter",
+            "fmt": f"{Fore.GREEN}{{asctime}}{Fore.RESET} [{{levelname}}] {Fore.CYAN}{name}{Fore.RESET} "
+            '| {{client_addr}} - "{{request_line}}" {{status_code}}',
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "style": "{",
+            "use_colors": True,
         },
     }
 
+    return config
+
 
 def get_formater(name: str) -> logging.Formatter:
-    return logging.Formatter("{asctime} [{levelname}] | " + name + " | {message}", "%Y-%m-%d %H:%M:%S", style="{")
+    return ColorFormatter(
+        f"{{asctime}} [{{levelname}}] {Fore.CYAN}{name}{Fore.RESET} | {{message}}", "%Y-%m-%d %H:%M:%S", style="{"
+    )
 
 
 aiotieba.logging.set_formatter(get_formater("aiotieba.{funcName}"))
@@ -133,11 +146,14 @@ class LogRecorder:
 logger.remove()
 
 # 自定义格式
-log_format = "{time:YYYY-MM-DD HH:mm:ss} [{level}] | {extra[name]} | {message}"
+log_format_no_color = "{time:YYYY-MM-DD HH:mm:ss} [{level}] {extra[name]} | {message}"
+log_format_color = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> [<level>{level}</level>] <cyan>{extra[name]}</cyan> | {message}"
+)
 
-logger.add(try_broadcast_log, format=log_format, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
+logger.add(try_broadcast_log, format=log_format_no_color, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
 
-logger.add(LogRecorder.sink, format=log_format, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
+logger.add(LogRecorder.sink, format=log_format_no_color, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
 
 
 # 只在开发模式或调试模式下输出所有日志，否则只输出 system 日志和错误以上级别的日志
@@ -147,12 +163,19 @@ def console_filter(record: Record):
     return record["extra"].get("name") == "system" or record["level"].no >= logger.level("ERROR").no
 
 
-logger.add(sys.stdout, format=log_format, filter=console_filter, level=LOG_LEVEL, diagnose=LOGURU_DIAGNOSE)
+logger.add(
+    sys.stdout,
+    format=log_format_color,
+    filter=console_filter,
+    level=LOG_LEVEL,
+    diagnose=LOGURU_DIAGNOSE,
+    colorize=True,
+)
 
 # 修改文件处理器：输出到 logos 文件夹下
 logger.add(
     LOG_DIR / "webtm_{time:YYYY-MM-DD}.log",
-    format=log_format,
+    format=log_format_no_color,
     rotation="00:00",
     retention="1 month",
     level=LOG_LEVEL,
@@ -161,7 +184,7 @@ logger.add(
 
 logger.add(
     JSON_LOG_DIR / "webtm_{time:YYYY-MM-DD}.json",
-    format=log_format,
+    format=log_format_no_color,
     rotation="00:00",
     retention="1 month",
     level=LOG_LEVEL,
