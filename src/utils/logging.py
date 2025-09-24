@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from loguru import Message, Record
 
 
-colorama.init(autoreset=True)
+colorama.just_fix_windows_console()
 
 
 LEVEL_COLOR = {
