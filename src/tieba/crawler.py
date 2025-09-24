@@ -31,9 +31,9 @@ async def clear_content_cache(_=None):
         clear_before = datetime.now(ZoneInfo("Asia/Shanghai")) - timedelta(seconds=PID_CACHE_EXPIRE)
         clear_num = await Database.clear_contents_before(clear_before)
         if clear_num:
-            system_logger.info(f"清理内容缓存，清理 {clear_num} 条内容，耗时 {t.cost:.2f} 秒")
+            system_logger.info(f"成功清理 {clear_num} 条过期内容缓存. 耗时: {t.cost:.2f}s")
         else:
-            system_logger.info(f"清理内容缓存，无需清理，耗时 {t.cost:.2f} 秒")
+            system_logger.debug(f"无需清理内容缓存. 耗时: {t.cost:.2f}s")
 
 
 class CrawlNeed(BaseModel):
@@ -227,12 +227,12 @@ class Crawler:
 
             if Controller.running:
                 if len(change_str) == 1:
-                    system_logger.info(f"更新爬虫监控需求：{change_str[0]}")
+                    system_logger.info(f"爬虫监控需求已更新: {change_str[0]}")
                 elif change_str:
-                    system_logger.info(f"更新爬虫监控需求：\n{'\n'.join(change_str)}")
+                    system_logger.info(f"爬虫监控需求已更新:\n{'\n'.join(change_str)}")
 
                 system_logger.debug(
-                    "当前爬虫监控需求：\n" + "\n".join(f"{fname}{need}" for fname, need in new_needs.items())
+                    "当前爬虫监控需求:\n" + "\n".join(f"{fname}{need}" for fname, need in new_needs.items())
                 )
 
             cls.needs = new_needs
@@ -241,15 +241,16 @@ class Crawler:
     @classmethod
     async def start_or_stop(cls, _: None = None):
         if cls.needs and not cls.task and Controller.running:
-            system_logger.info(f"启动爬虫，监控 {len(cls.needs)} 个贴吧")
             cls.task = asyncio.create_task(cls.crawl())
+            system_logger.info(f"爬虫已启动，监控 {len(cls.needs)} 个贴吧")
         elif (not cls.needs or not Controller.running) and cls.task:
-            if not Controller.running:
-                system_logger.info("停止爬虫")
-            elif not cls.needs:
-                system_logger.info("停止爬虫，没有需要监控的贴吧")
             cls.task.cancel()
             cls.task = None
+
+            if not Controller.running:
+                system_logger.info("爬虫已停止")
+            elif not cls.needs:
+                system_logger.info("没有需要监控的贴吧，爬虫已停止")
 
     @classmethod
     async def restart(cls, data: UpdateEventData[SystemConfig]):
@@ -260,10 +261,10 @@ class Crawler:
     @classmethod
     async def crawl(cls):
         while True:
-            with exception_logger("爬虫循环异常"):
+            with exception_logger("爬虫任务发生异常"):
                 for forum, need in cls.needs.items():
                     async for content in cls.get_spider().crawl(forum, need):
-                        system_logger.debug(f"爬取到新内容 {content.mark} 来自 {forum}")
+                        system_logger.debug(f"爬取到新内容. {content.mark} 来自 {forum}")
                         await Database.save_items([ContentModel.from_content(content)])
                         await Controller.DispatchContent.broadcast(content)
             await asyncio.sleep(Controller.config.scan.loop_cd)

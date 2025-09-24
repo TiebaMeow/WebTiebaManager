@@ -71,7 +71,7 @@ class Database:
     @classmethod
     async def startup(cls, _: None = None) -> None:
         config = Controller.config
-        system_logger.info("初始化数据库连接...")
+        system_logger.info("正在初始化数据库...")
         system_logger.info(f"数据库类型: {config.database.type}")
         database_config = DatabaseConfig.model_validate(config.database)
         cls.engine = create_async_engine(
@@ -81,11 +81,13 @@ class Database:
         cls.sessionmaker = async_sessionmaker(cls.engine, class_=AsyncSession, expire_on_commit=False)
         async with cls.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        system_logger.info("数据库初始化完成")
 
     @classmethod
     async def teardown(cls, _: None = None) -> None:
-        system_logger.info("关闭数据库连接...")
+        system_logger.info("正在关闭数据库连接...")
         await cls.engine.dispose()
+        system_logger.info("数据库连接已关闭")
 
     @classmethod
     @asynccontextmanager
@@ -104,7 +106,7 @@ class Database:
         old_db = DatabaseConfig.model_validate(data.old.database)
         new_db = DatabaseConfig.model_validate(data.new.database)
         if old_db != new_db:
-            system_logger.info("数据库配置已更改，正在重新连接数据库...")
+            system_logger.info("检测到数据库配置已更改，正在重新连接...")
             await cls.teardown()
             await cls.startup()
 

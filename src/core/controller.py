@@ -60,7 +60,7 @@ class Controller:
 
         cls.running = False
         await cls.Stop.broadcast(None)
-        system_logger.info("系统停止运行，可以安全退出")
+        system_logger.info("系统已停止运行，可以安全退出")
 
     @classmethod
     async def update_config(cls, new_config: SystemConfig):
@@ -71,4 +71,4 @@ class Controller:
         cls.config = new_config
         write_config(new_config, SYSTEM_CONFIG_PATH)
         await cls.SystemConfigChange.broadcast(UpdateEventData(old=old_config, new=new_config))
-        system_logger.info("系统配置已更改")
+        system_logger.info("系统配置已更新")

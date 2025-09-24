@@ -57,7 +57,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             status_code=exc.status_code,
             content={"message": exc.detail},
         )
-    system_logger.exception(f"服务器内部错误: {exc}")
+    system_logger.exception(f"服务器捕获到未经处理的异常. {exc}")
     return JSONResponse(
         status_code=500,
         content={"message": "服务器内部错误", "detail": str(exc)},
@@ -97,14 +97,15 @@ class Server:
     def display_startup_messages(cls, config: ServerConfig):
         system_logger.info(f"WebTiebaManager v{PROGRAM_VERSION}[{WEB_UI_CODE}]")
         if DEV:
-            system_logger.warning("开发模式运行，请勿在生产环境使用")
+            system_logger.warning("开发模式已启用，请勿在生产环境使用")
         if DEV_WEBUI:
-            system_logger.warning("网页开发模式启用，请勿在生产环境使用")
+            system_logger.warning("网页开发模式已启用，请勿在生产环境使用")
 
         if cls.need_initialize():
             system_logger.warning(f"初始化密钥: {cls.secure_key()}")
-            system_logger.warning("程序未初始化，请先进行初始化")
+            system_logger.warning("检测到程序未初始化，请完成初始化")
             if PUBLIC:
+                # TODO 公网运行模式下，添加一定时间不初始化则自动关闭服务的功能
                 system_logger.warning("正在以公网模式运行，请尽快完成初始化！")
 
         listenable_urls = config.listenable_urls

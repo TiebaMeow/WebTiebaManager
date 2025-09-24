@@ -64,7 +64,7 @@ async def realtime_log(name: str, request: Request):
             log_data = LogData.from_message(data.message)
             await queue.put(log_data)
         except Exception:
-            system_logger.exception("推送日志时发生错误")
+            system_logger.exception("推送实时日志失败")
 
     listener = LogEvent.on(log_listener)
 
@@ -80,7 +80,7 @@ async def realtime_log(name: str, request: Request):
                 if await request.is_disconnected():
                     break
         except Exception:
-            system_logger.exception("推送日志时发生错误")
+            system_logger.exception("推送实时日志失败")
         finally:
             listener.un_register()
 
