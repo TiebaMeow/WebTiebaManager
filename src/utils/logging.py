@@ -60,7 +60,7 @@ def get_uvicorn_log_config(name: str) -> dict:
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
             "fmt": f"{Fore.GREEN}{{asctime}}{Fore.RESET} [{{levelname}}] {Fore.CYAN}{name}{Fore.RESET} "
-            '| {{client_addr}} - "{{request_line}}" {{status_code}}',
+            '| {client_addr} - "{request_line}" {status_code}',
             "datefmt": "%Y-%m-%d %H:%M:%S",
             "style": "{",
             "use_colors": True,
