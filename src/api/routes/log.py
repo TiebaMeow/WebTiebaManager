@@ -87,7 +87,7 @@ async def realtime_log(name: str, request: Request):
         try:
             while True:
                 try:
-                    log = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    log = await asyncio.wait_for(queue.get(), timeout=0.1)
                     if log is None:
                         yield "data: [DONE]\n\n"
                         continue
