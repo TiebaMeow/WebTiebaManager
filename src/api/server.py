@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.config import ServerConfig
-from src.core.constants import ALLOW_ORIGINS, DEV, PUBLIC, SYSTEM_CONFIG_PATH
+from src.core.constants import ALLOW_ORIGINS, DEV, DEV_WEBUI, PROGRAM_VERSION, PUBLIC, SYSTEM_CONFIG_PATH, WEB_UI_CODE
 from src.core.controller import Controller
 from src.core.initialize import initialize
 from src.user.manager import UserManager
@@ -17,7 +17,6 @@ from src.utils.tools import random_str
 
 def initialize_server_config():
     if PUBLIC:
-        system_logger.warning("正在以公网模式运行，请尽快完成初始化")
         return ServerConfig(host="0.0.0.0")
     else:
         return ServerConfig()
@@ -30,9 +29,11 @@ async def lifespan(app: FastAPI):
     # 在此调用以保证所有模式下都能正确初始化
     initialize()
 
+    # if DEV:
+    config = initialize_server_config() if Server.need_system() else Controller.config.server
+    Server.display_startup_messages(config)
+
     await Controller.start()
-    if Server.need_initialize():
-        system_logger.warning(f"初始化密钥: {Server.secure_key()}")
 
     yield
     await Controller.stop()
@@ -93,8 +94,21 @@ class Server:
         return cls.need_system() or cls.need_user()
 
     @classmethod
-    def console_prompt(cls, config: ServerConfig, log_fn=system_logger.info):
+    def display_startup_messages(cls, config: ServerConfig):
+        system_logger.info(f"WebTiebaManager v{PROGRAM_VERSION}[{WEB_UI_CODE}]")
+        if DEV:
+            system_logger.warning("开发模式运行，请勿在生产环境使用")
+        if DEV_WEBUI:
+            system_logger.warning("网页开发模式启用，请勿在生产环境使用")
+
+        if cls.need_initialize():
+            system_logger.warning(f"初始化密钥: {cls.secure_key()}")
+            system_logger.warning("程序未初始化，请先进行初始化")
+            if PUBLIC:
+                system_logger.warning("正在以公网模式运行，请尽快完成初始化！")
+
         listenable_urls = config.listenable_urls
+        log_fn = system_logger.warning if DEV else system_logger.info
         if len(listenable_urls) == 1:
             log_fn(f"访问 {listenable_urls[0]} 进行管理")
         else:
@@ -108,16 +122,9 @@ class Server:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
 
             config = initialize_server_config() if cls.need_system() else Controller.config.server
-
             server = uvicorn.Server(uvicorn.Config(app, **config.uvicorn_config_param))
             cls.server = server
-
-            if cls.need_initialize():
-                system_logger.warning("系统未初始化，请先进行初始化")
-                cls.console_prompt(config, log_fn=system_logger.warning)
-            else:
-                system_logger.info("正在启动服务")
-                cls.console_prompt(config)
+            # cls.display_startup_messages(config)
 
             await server.serve()
 
@@ -141,8 +148,6 @@ class Server:
             with exception_logger("服务运行异常", reraise=True):
                 if DEV:
                     config = initialize_server_config() if cls.need_system() else Controller.config.server
-                    system_logger.warning("开发模式运行，请勿在生产环境使用")
-                    cls.console_prompt(config, log_fn=system_logger.warning)
                     cls.dev_run(config)
                 else:
                     import asyncio
