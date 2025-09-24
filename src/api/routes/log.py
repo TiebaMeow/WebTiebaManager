@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import TYPE_CHECKING, Literal
 
 import aiofiles
@@ -10,7 +11,7 @@ from pydantic import BaseModel
 
 from src.core.constants import DEV
 from src.core.controller import Controller
-from src.utils.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
+from src.utils.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, exception_logger, system_logger
 
 from ..auth import current_user_depends, ensure_system_access_depends, parse_token
 from ..server import BaseResponse, Server, app
@@ -28,14 +29,26 @@ class LogData(BaseModel):
     name: str
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     extra: dict
+    time: str
 
     @staticmethod
     def from_message(message: Message) -> LogData:
         return LogData(
-            message=message.rstrip("\n"),
+            message=message.record["message"],
             name=message.record["extra"].get("name", "unknown"),
             level=message.record["level"].name.upper(),  # type: ignore
             extra={k: v for k, v in message.record["extra"].items() if k != "name"},
+            time=message.record["time"].strftime("%H:%M:%S"),
+        )
+
+    @staticmethod
+    def from_json_message(message: dict) -> LogData:
+        return LogData(
+            message=message["record"]["message"],
+            name=message["record"]["extra"].get("name", "unknown"),
+            level=message["record"]["level"]["name"].upper(),
+            extra={k: v for k, v in message["record"]["extra"].items() if k != "name"},
+            time=time.strftime("%H:%M:%S", time.localtime(message["record"]["time"]["timestamp"])),
         )
 
 
@@ -114,9 +127,9 @@ async def get_log(target_name: str, file: str):
         return BaseResponse(data=[], message="日志文件不存在", code=400)
 
     logs = []
-    async with aiofiles.open(path, encoding="utf-8") as f:
-        async for line in f:
-            try:
+    with exception_logger("读取日志文件失败", reraise=False):
+        async with aiofiles.open(path, encoding="utf-8") as f:
+            async for line in f:
                 log = json.loads(line)
                 extra = log["record"]["extra"]
                 if "name" in extra:
@@ -129,16 +142,7 @@ async def get_log(target_name: str, file: str):
                     # 不是当前用户的日志 / 订阅者不是 system
                     continue
 
-                logs.append(
-                    LogData(
-                        message=log["text"].rstrip("\n"),
-                        name=name,
-                        level=log["record"]["level"]["name"].upper(),
-                        extra=extra,
-                    )
-                )
-            except Exception:
-                continue
+                logs.append(LogData.from_json_message(log))
 
     return BaseResponse(data=logs)
 
