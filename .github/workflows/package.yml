@@ -39,7 +39,7 @@ jobs:
         run: |
           $TAG = "${{ steps.get_tag.outputs.tag }}"
           $EXE_NAME = "webtm_$TAG"
-          uv run pyinstaller --noconfirm --onefile --name $EXE_NAME --hidden-import="passlib.handlers.bcrypt" --hidden-import="aiosqlite" start.py
+          uv run pyinstaller --noconfirm --onefile --name $EXE_NAME --icon="wtm.ico" --hidden-import="passlib.handlers.bcrypt" --hidden-import="aiosqlite" start.py
         shell: pwsh
 
       - name: Zip exe file
@@ -47,7 +47,7 @@ jobs:
           $TAG = "${{ steps.get_tag.outputs.tag }}"
           $EXE_NAME = "webtm_$TAG.exe"
           $ZIP_NAME = "webtm_$TAG.zip"
-          Compress-Archive -Path "dist/$EXE_NAME" -DestinationPath "dist/$ZIP_NAME"
+          Compress-Archive -Path "dist/$EXE_NAME", "resources" -DestinationPath "dist/$ZIP_NAME"
         shell: pwsh
 
       - name: Create Release and Upload Asset
