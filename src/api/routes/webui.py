@@ -86,6 +86,12 @@ async def assets(path: str, request: Request):
     return Response(content=content, status_code=status_code, headers=headers)
 
 
+@app.get("/favicon.ico", tags=["webui"])
+async def favicon(request: Request):
+    content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/favicon.ico", request)
+    return Response(content=content, status_code=status_code, headers=headers)
+
+
 class ServerInfo(BaseModel):
     version: str
     need_initialize: bool
