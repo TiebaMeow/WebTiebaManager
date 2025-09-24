@@ -70,13 +70,13 @@ def get_uvicorn_log_config(name: str) -> dict:
     return config
 
 
-def get_formater(name: str) -> logging.Formatter:
+def get_formatter(name: str) -> logging.Formatter:
     return ColorFormatter(
         f"{{asctime}} [{{levelname}}] {Fore.CYAN}{name}{Fore.RESET} | {{message}}", "%Y-%m-%d %H:%M:%S", style="{"
     )
 
 
-aiotieba.logging.set_formatter(get_formater("aiotieba.{funcName}"))
+aiotieba.logging.set_formatter(get_formatter("aiotieba.{funcName}"))
 
 
 class LogEventData(NamedTuple):
