@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -133,9 +134,37 @@ class Server:
                 break
 
     @classmethod
-    async def shutdown(cls):
-        if cls.server:
-            cls.server.should_exit = True
+    async def shutdown(cls, restart: bool = False, shutdown_timeout: int = 10):
+        """
+        优雅关闭服务器，如果超时则强制退出
+
+        Args:
+            shutdown_timeout: 等待时间（秒），默认10秒
+        """
+        if cls.server is None:
+            return
+
+        if restart:
+            system_logger.info("正在重启服务...")
+        else:
+            system_logger.info("正在关闭服务...")
+
+        cls.need_restart = restart
+
+        server = cls.server
+
+        server.should_exit = True
+
+        # 等待指定时间
+        await asyncio.sleep(shutdown_timeout)
+
+        # 检查服务器是否仍在运行（通过检查连接状态）
+        if server.server_state.connections or server.server_state.tasks:
+            # 如果仍有活跃连接或任务，设置强制退出标志
+            server.force_exit = True
+
+            system_logger.warning("等待超时，正在强制退出...")
+            system_logger.warning("若程序未能退出，请手动结束进程")
 
     @classmethod
     def dev_run(cls, config: ServerConfig):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -19,7 +21,7 @@ from src.utils.logging import system_logger
 from src.utils.tools import random_str, validate_password
 
 from ..auth import ensure_system_access_depends, ip_depends  # noqa: TC001
-from ..server import BaseResponse, app
+from ..server import BaseResponse, Server, app
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")
@@ -180,8 +182,9 @@ async def set_config(system_access: ensure_system_access_depends, req: SystemCon
         return BaseResponse(data=False, message=str(e), code=500)
 
     if server_update:
-        system_logger.info("检测到服务器配置变更，请重启程序以应用更改")
-        return BaseResponse(data=True, message="保存成功，请重启程序以应用更改")
+        system_logger.info("检测到服务器配置变更，正在重启服务以应用更改...")
+        asyncio.create_task(Server.shutdown(restart=True))
+        return BaseResponse(data=True, message="保存成功，服务器正在重启以应用更改，请稍后重新连接")
     else:
         return BaseResponse(data=True, message="保存成功")
 

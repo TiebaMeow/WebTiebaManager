@@ -8,10 +8,12 @@ import aiofiles
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from src.core.constants import DEV
+from src.core.controller import Controller
 from src.utils.logging import JSON_LOG_DIR, LogEvent, LogEventData, LogRecorder, system_logger
 
 from ..auth import current_user_depends, ensure_system_access_depends, parse_token
-from ..server import BaseResponse, app
+from ..server import BaseResponse, Server, app
 
 if TYPE_CHECKING:
     from loguru import Message
@@ -71,13 +73,20 @@ async def realtime_log(name: str, request: Request):
     async def event_generator():
         try:
             while True:
-                log = await queue.get()
-                if log is None:
-                    yield "data: [DONE]\n\n"
-                    continue
+                try:
+                    log = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    if log is None:
+                        yield "data: [DONE]\n\n"
+                        continue
 
-                yield f"data: {json.dumps(log.model_dump(), ensure_ascii=False)}\n\n"
-                if await request.is_disconnected():
+                    yield f"data: {json.dumps(log.model_dump(), ensure_ascii=False)}\n\n"
+                except TimeoutError:
+                    pass
+                if (
+                    await request.is_disconnected()
+                    or not Controller.running
+                    or (not DEV and (not Server.server or Server.server.should_exit))
+                ):
                     break
         except Exception:
             system_logger.exception("推送实时日志失败")
