@@ -49,9 +49,9 @@ class Controller:
         if cls.running:
             return
 
-        system_logger.info("系统开始运行")
         cls.running = True
         await cls.Start.broadcast(None)
+        system_logger.info("系统开始运行")
 
     @classmethod
     async def stop(cls):
@@ -60,7 +60,7 @@ class Controller:
 
         cls.running = False
         await cls.Stop.broadcast(None)
-        system_logger.info("系统停止运行")
+        system_logger.info("系统停止运行，可以安全退出")
 
     @classmethod
     async def update_config(cls, new_config: SystemConfig):
