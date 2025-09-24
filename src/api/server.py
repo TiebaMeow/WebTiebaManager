@@ -12,8 +12,12 @@ from src.core.constants import ALLOW_ORIGINS, DEV, DEV_WEBUI, PROGRAM_VERSION, P
 from src.core.controller import Controller
 from src.core.initialize import initialize
 from src.user.manager import UserManager
-from src.utils.logging import exception_logger, system_logger
+from src.utils.logging import exception_logger, get_uvicorn_log_config, system_logger
 from src.utils.tools import random_str
+
+
+def get_log_config():
+    return get_uvicorn_log_config("uvicorn")
 
 
 def initialize_server_config():
@@ -130,7 +134,7 @@ class Server:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
 
             config = initialize_server_config() if cls.need_system() else Controller.config.server
-            server = uvicorn.Server(uvicorn.Config(app, **config.uvicorn_config_param))
+            server = uvicorn.Server(uvicorn.Config(app, **config.uvicorn_config_param, log_config=get_log_config()))
             cls.server = server
             # cls.display_startup_messages(config)
 
@@ -182,7 +186,13 @@ class Server:
     @classmethod
     def dev_run(cls, config: ServerConfig):
         uvicorn.run(
-            "src.api.server:app", host=config.host, port=config.port, log_level="info", access_log=True, reload=True
+            "src.api.server:app",
+            host=config.host,
+            port=config.port,
+            log_level="info",
+            access_log=True,
+            reload=True,
+            log_config=get_log_config(),
         )
 
     @classmethod

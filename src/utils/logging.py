@@ -7,7 +7,7 @@ import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
-from aiotieba.logging import set_formatter
+import aiotieba
 from loguru import logger
 
 from src.core.constants import BASE_DIR, DEBUG, DEV
@@ -20,9 +20,50 @@ if TYPE_CHECKING:
 
 LOGURU_DIAGNOSE = os.getenv("LOGURU_DIAGNOSE", "false").lower() == "true" or DEBUG
 
-set_formatter(
-    logging.Formatter("{asctime} [{levelname}] | aiotieba.{funcName} | {message}", "%Y-%m-%d %H:%M:%S", style="{")
-)
+
+def get_uvicorn_log_config(name: str) -> dict:
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "()": "logging.Formatter",
+                "fmt": f"{{asctime}} [{{levelname}}] | {name} | {{message}}",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+                "style": "{",
+            },
+            "access": {
+                "()": "uvicorn.logging.AccessFormatter",
+                "fmt": f'{{asctime}} [{{levelname}}] | {name} | {{client_addr}} - "{{request_line}}" {{status_code}}',
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+                "style": "{",
+            },
+        },
+        "handlers": {
+            "default": {
+                "formatter": "default",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stderr",
+            },
+            "access": {
+                "formatter": "access",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+            },
+        },
+        "loggers": {
+            "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+            "uvicorn.error": {"level": "INFO"},
+            "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+        },
+    }
+
+
+def get_formater(name: str) -> logging.Formatter:
+    return logging.Formatter("{asctime} [{levelname}] | " + name + " | {message}", "%Y-%m-%d %H:%M:%S", style="{")
+
+
+aiotieba.logging.set_formatter(get_formater("aiotieba.{funcName}"))
 
 
 class LogEventData(NamedTuple):
