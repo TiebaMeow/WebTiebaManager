@@ -54,14 +54,14 @@ class TiebaClient:
 
     async def start(self) -> bool:
         if not self.bduss or not self.stoken:
-            self.logger.warning("未提供 BDUSS 或 STOKEN，无法登录贴吧，吧务操作将不可用")
+            self.logger.warning("缺少 BDUSS 或 STOKEN，无法登录贴吧，吧务操作将不可用")
             self.status = TiebaClientStatus.MISSING_COOKIE
             return False
 
         try:
             self._client = aiotieba.Client(BDUSS=self.bduss, STOKEN=self.stoken)
         except ValueError as e:
-            self.logger.error(f"贴吧客户端初始化失败，原因：{e}")
+            self.logger.error(f"贴吧客户端初始化失败. {e}")
             self.failed_reason = str(e)
             self.status = TiebaClientStatus.FAILED
             self._client = None
@@ -71,7 +71,7 @@ class TiebaClient:
             await self._client.__aenter__()
             self.info = await self._client.get_self_info()
         except Exception as e:
-            self.logger.exception(f"贴吧登录失败，原因：{e}")
+            self.logger.exception(f"贴吧登录失败. {e}")
             self.failed_reason = str(e)
             self.status = TiebaClientStatus.FAILED
             return False
@@ -82,7 +82,7 @@ class TiebaClient:
             self.logger.error("贴吧登录失败，无法获取个人信息，BDUSS 或 STOKEN 无效")
             return False
 
-        self.logger.info(f"贴吧登录成功 用户名：{self.info.user_name}")
+        self.logger.info(f"贴吧登录成功，用户名: {self.info.user_name}")
         self.status = TiebaClientStatus.SUCCESS
         return True
 
@@ -110,26 +110,30 @@ class TiebaClient:
             else:
                 result = await self._delete_post(content.fname, tid=content.tid, pid=content.pid)
         except TiebaClient.InvalidClientError:
-            self.logger.warning("无法删除，未登录")
+            self.logger.warning(f"删除 {content.mark} 失败，账号未登录", tid=content.tid, pid=content.pid)
             return False
 
         if not result:
-            self.logger.warning(f"删除失败 {content.mark} {result.err}", tid=content.tid, pid=content.pid)
+            self.logger.warning(f"删除 {content.mark} 失败，原因: {result.err}", tid=content.tid, pid=content.pid)
             return False
 
         return True
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        self.logger.info(f"正在封禁 {content.user.log_name}", uid=content.user.user_id, portrait=content.user.portrait)
+        self.logger.info(f"封禁 {content.user.log_name}", uid=content.user.user_id, portrait=content.user.portrait)
         try:
             result = await self.client.block(content.fname, content.user.portrait, day=day, reason=reason)
         except TiebaClient.InvalidClientError:
-            self.logger.warning("无法封禁，未登录")
+            self.logger.warning(
+                f"封禁 {content.user.log_name} 失败. 账号未登录",
+                uid=content.user.user_id,
+                portrait=content.user.portrait,
+            )
             return False
 
         if not result:
             self.logger.warning(
-                f"封禁失败 {content.user.log_name} {result.err}",
+                f"封禁 {content.user.log_name} 失败，原因: {result.err}",
                 uid=content.user.user_id,
                 portrait=content.user.portrait,
             )
@@ -247,7 +251,7 @@ class User:
 
         if not initialize:
             self.save_config()
-            self.logger.info("设置已更新")
+            self.logger.info("用户配置已更新")
 
     def save_config(self):
         write_config(self.config, self.dir / User.CONFIG_FILE)
@@ -342,7 +346,7 @@ class User:
     async def operate_confirm(self, confirm: ConfirmData | str | int, action: Literal["execute", "ignore"]) -> bool:
         if isinstance(confirm, (str, int)):
             if (_ := await self.confirm.get(confirm)) is None:
-                self.logger.warning(f"未找到对应的确认请求 confirm={confirm}")
+                self.logger.warning(f"未找到对应的确认请求 id={confirm}")
                 return False
 
             confirm = _
@@ -354,6 +358,7 @@ class User:
                     f"忽略 {confirm.content.mark} 的确认", tid=confirm.content.tid, pid=confirm.content.pid
                 )
                 return True
+
             elif action == "execute":
                 obj = ProcessObject(confirm.content, confirm.data)
                 og = OperationGroup.deserialize(confirm.operations)  # type: ignore
@@ -370,9 +375,11 @@ class User:
                 await self.operate(obj, og)
                 await self.confirm.delete(confirm.content.pid)
                 return True
+
             else:
-                self.logger.warning(f"未知的操作类型 {action}")
+                self.logger.warning(f"未知的确认操作类型. {action}")
                 raise ValueError("Invalid action")
+
         else:
-            self.logger.warning(f"未知的确认类型 {type(confirm)}")
+            self.logger.warning(f"未知的确认类型. {type(confirm)}")
             raise ValueError("Invalid confirm type")

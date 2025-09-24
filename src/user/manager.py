@@ -94,7 +94,7 @@ class UserManager:
 
         write_config(config, user.dir / User.CONFIG_FILE)
 
-        system_logger.info(f"创建用户 {config.user.username}")
+        system_logger.info(f"成功创建用户. 用户名: {config.user.username}")
 
     @classmethod
     async def delete_user(cls, username: str):
@@ -107,7 +107,7 @@ class UserManager:
 
         await cls.UserChange.broadcast(None)
 
-        system_logger.info(f"删除用户 {username}")
+        system_logger.info(f"成功删除用户. 用户名: {username}")
 
     @classmethod
     async def update_config(cls, config: UserConfig, /, system_access: bool = False):
@@ -122,7 +122,7 @@ class UserManager:
         return cls.users.get(username)
 
     @classmethod
-    async def change_user_status(cls, username: str, status: bool):
+    async def change_user_status(cls, username: str, status: bool, by_system: bool = False):
         user = cls.get_user(username)
         if not user:
             return False
@@ -131,10 +131,15 @@ class UserManager:
 
         new_config = user.config.model_copy(deep=True)
         new_config.enable = status
-        await cls.update_config(new_config)
+        await cls.update_config(new_config, system_access=by_system)
 
-        system_logger.info(f"{'启用' if status else '禁用'}用户 {username}")
-        user.logger.info(f"已{'启用' if status else '禁用'}")
+        op_text = "启用" if status else "禁用"
+        if by_system:
+            system_logger.info(f"系统管理员{op_text}了用户 {username}")
+            user.logger.info(f"系统管理员{op_text}了你的账号")
+        else:
+            system_logger.info(f"用户 {username} {op_text}了账号")
+            user.logger.info(f"{op_text}了账号")
 
         return True
 
