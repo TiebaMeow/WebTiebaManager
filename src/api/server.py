@@ -83,6 +83,12 @@ class Server:
         return cls._secure_key
 
     @classmethod
+    def should_exit(cls):
+        if cls.server is None:
+            return not DEV
+        return cls.server.should_exit
+
+    @classmethod
     def need_system(cls):
         return not SYSTEM_CONFIG_PATH.exists()
 
@@ -142,6 +148,13 @@ class Server:
             shutdown_timeout: 等待时间（秒），默认10秒
         """
         if cls.server is None:
+            if DEV:
+                if restart:
+                    system_logger.warning("开发模式下无法自动关闭服务，请手动停止后重启")
+                else:
+                    system_logger.warning("开发模式下无法自动关闭服务，请手动停止")
+            else:
+                system_logger.warning("服务器未运行，无法关闭")
             return
 
         if restart:
