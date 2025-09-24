@@ -172,12 +172,17 @@ class Server:
 
         server.should_exit = True
 
-        # 等待指定时间
-        await asyncio.sleep(shutdown_timeout)
+        waited = 0
+        poll_interval = 0.1
 
-        # 检查服务器是否仍在运行（通过检查连接状态）
-        if server.server_state.connections or server.server_state.tasks:
-            # 如果仍有活跃连接或任务，设置强制退出标志
+        while waited < shutdown_timeout:
+            # 检查服务器是否仍在运行（通过检查连接状态）
+            if not server.server_state.connections and not server.server_state.tasks:
+                break
+
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+        else:
             server.force_exit = True
 
             system_logger.warning("等待超时，正在强制退出...")
