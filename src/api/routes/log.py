@@ -82,11 +82,7 @@ async def realtime_log(name: str, request: Request):
                     yield f"data: {json.dumps(log.model_dump(), ensure_ascii=False)}\n\n"
                 except TimeoutError:
                     pass
-                if (
-                    await request.is_disconnected()
-                    or not Controller.running
-                    or (not DEV and (not Server.server or Server.server.should_exit))
-                ):
+                if await request.is_disconnected() or not Controller.running or Server.should_exit():
                     break
         except Exception:
             system_logger.exception("推送实时日志失败")
