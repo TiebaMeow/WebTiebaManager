@@ -38,21 +38,21 @@ jobs:
       - name: Build executable with PyInstaller
         run: |
           $TAG = "${{ steps.get_tag.outputs.tag }}"
-          $EXE_NAME = "webtm_$TAG"
+          $EXE_NAME = "WebTM_$TAG"
           uv run pyinstaller --noconfirm --onefile --name $EXE_NAME --icon="wtm.ico" --hidden-import="passlib.handlers.bcrypt" --hidden-import="aiosqlite" start.py
         shell: pwsh
 
       - name: Zip exe file
         run: |
           $TAG = "${{ steps.get_tag.outputs.tag }}"
-          $EXE_NAME = "webtm_$TAG.exe"
-          $ZIP_NAME = "webtm_$TAG.zip"
+          $EXE_NAME = "WebTM_$TAG.exe"
+          $ZIP_NAME = "WebTM_$TAG.zip"
           Compress-Archive -Path "dist/$EXE_NAME", "resources" -DestinationPath "dist/$ZIP_NAME"
         shell: pwsh
 
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/webtm_${{ steps.get_tag.outputs.tag }}.zip
+          files: dist/WebTM_${{ steps.get_tag.outputs.tag }}.zip
           tag_name: ${{ steps.get_tag.outputs.tag }}
           draft: true
