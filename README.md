@@ -92,7 +92,6 @@ uv run start.py
 | 7*24 运行设备 | 家用主机 / NAS / 服务器均可 |
 | Python ≥ 3.12 | 官方下载或使用发行版包管理器 |
 
-
 ## 开发与测试
 
 ### 本地开发建议流程
@@ -100,6 +99,7 @@ uv run start.py
 ```bash
 git clone https://github.com/TiebaMeow/WebTiebaManager.git
 cd WebTiebaManager
+git checkout -b feature/your-feature develop
 uv sync
 uv run start.py --dev
 ```
