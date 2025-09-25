@@ -8,12 +8,22 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.config import ServerConfig
-from src.core.constants import ALLOW_ORIGINS, DEV, DEV_WEBUI, PROGRAM_VERSION, PUBLIC, SYSTEM_CONFIG_PATH, WEB_UI_CODE
+from src.core.constants import (
+    ALLOW_ORIGINS,
+    DEV,
+    DEV_WEBUI,
+    IS_EXE,
+    PROGRAM_VERSION,
+    PUBLIC,
+    SYSTEM_CONFIG_PATH,
+    WEB_UI_CODE,
+)
 from src.core.controller import Controller
 from src.core.initialize import initialize
 from src.user.manager import UserManager
 from src.utils.logging import exception_logger, get_uvicorn_log_config, system_logger
 from src.utils.tools import random_str
+from src.utils.version import check_for_updates
 
 
 def get_log_config():
@@ -107,6 +117,8 @@ class Server:
     @classmethod
     def display_startup_messages(cls, config: ServerConfig):
         system_logger.info(f"WebTiebaManager v{PROGRAM_VERSION}[{WEB_UI_CODE}]")
+        if IS_EXE:
+            system_logger.info("EXE 运行环境：如遇异常或启动失败，建议使用 Python 环境部署")
         if DEV:
             system_logger.warning("开发模式已启用，请勿在生产环境使用")
         if DEV_WEBUI:
@@ -130,6 +142,8 @@ class Server:
 
     @classmethod
     async def serve(cls):
+        asyncio.create_task(check_for_updates())
+
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
 
@@ -144,9 +158,18 @@ class Server:
                 break
 
     @classmethod
+    async def shutdown_task(cls, restart: bool = False, shutdown_timeout: int = 10):
+        """
+        创建后台任务优雅关闭服务器
+        """
+        return asyncio.create_task(cls.shutdown(restart=restart, shutdown_timeout=shutdown_timeout))
+
+    @classmethod
     async def shutdown(cls, restart: bool = False, shutdown_timeout: int = 10):
         """
         优雅关闭服务器，如果超时则强制退出
+
+        WARNING: 不应在http请求中直接调用此函数，应使用 shutdown_task，创建后台任务调用，否则会导致uvicorn无法优雅关闭
 
         Args:
             shutdown_timeout: 等待时间（秒），默认10秒

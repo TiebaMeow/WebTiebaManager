@@ -78,6 +78,6 @@ async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
         system_config = SystemConfig(server=ServerConfig.model_validate(request.system.model_dump()))
         await Controller.update_config(system_config)
 
-    system_logger.info("系统初始化完成，服务将在配置应用后自动重启...")
-    await Server.shutdown(restart=True, shutdown_timeout=3)
+    system_logger.info("系统初始化完成，程序将在配置应用后自动重启...")
+    await Server.shutdown_task(restart=True, shutdown_timeout=3)
     return BaseResponse(code=200, data=None)

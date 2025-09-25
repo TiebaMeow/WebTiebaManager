@@ -66,11 +66,18 @@ uv run start.py
 首次启动日志示例：
 
 ```log
-2025-09-19 11:45:14 [WARNING] | system | 系统未初始化，请先进行初始化
-2025-09-19 11:45:14 [WARNING] | system | 访问 http://0.0.0.0:36799 进行初始化
+2025-09-25 11:53:30 [INFO] system | WebTiebaManager v1.0.0[Ceylon]
+2025-09-25 11:53:30 [WARNING] system | 初始化密钥: KFCvme50
+2025-09-25 11:53:30 [WARNING] system | 检测到程序未初始化，请完成初始化
+2025-09-25 11:53:30 [INFO] system | 访问 http://localhost:36799 进行管理
+2025-09-25 11:53:30 [INFO] system | 正在初始化数据库...
+2025-09-25 11:53:30 [INFO] system | 数据库类型: sqlite
+2025-09-25 11:53:30 [INFO] system | 加载 0 个用户
+2025-09-25 11:53:30 [INFO] system | 数据库初始化完成
+2025-09-25 11:53:30 [INFO] system | 系统开始运行
 ```
 
-按提示访问地址完成初始化。完成后建议手动重启一次以确保环境稳定。
+按日志提示使用浏览器访问 <http://localhost:36799>，并使用“初始化密钥”完成初始化。完成后建议手动重启一次以确保环境稳定。
 
 ## Windows EXE 版
 
@@ -82,11 +89,8 @@ uv run start.py
 
 | 必要条件 | 说明 |
 |----------|------|
-| 7*24 运行设备 | 云服务器 / 家用主机 / NAS 均可 |
-| 公网或端口映射 | 无公网则仅本地访问；公网需开放端口 (默认 36799) |
+| 7*24 运行设备 | 家用主机 / NAS / 服务器均可 |
 | Python ≥ 3.12 | 官方下载或使用发行版包管理器 |
-
-防火墙 / 安全组需放行监听端口（默认 `36799`）。
 
 ## 开发与测试
 
@@ -95,6 +99,7 @@ uv run start.py
 ```bash
 git clone https://github.com/TiebaMeow/WebTiebaManager.git
 cd WebTiebaManager
+git checkout -b feature/your-feature develop
 uv sync
 uv run start.py --dev
 ```
@@ -114,25 +119,6 @@ uv run ruff check .
 
 ## FAQ
 
-### 公网访问相关
-
-**如何让外网访问？**
-
-1. 确认公网 IP 或已做端口映射
-2. 云服务器 / 防火墙放行端口 36799
-3. 通过 `http://<你的公网IP>:36799` 访问
-
-**如何获取公网 IP？**
-
-- Windows: `curl ifconfig.me` 或浏览器访问 [ip138](https://www.ip138.com/)
-- Linux / macOS: `curl ifconfig.me`
-
-**端口放行仍无法访问？**
-
-- 检查程序是否在运行
-- 检查云服务安全组 / 系统防火墙
-- 家用网络：确认路由器端口转发正确
-
 ### 其它
 
 如遇异常请附：复现步骤 + 关键日志 截图，在 [Issues](https://github.com/TiebaMeow/WebTiebaManager/issues) 提交。
@@ -141,7 +127,7 @@ uv run ruff check .
 
 - 问题 & 建议：提交 Issue
 - 贡献代码：Fork 后提 PR（建议先开 Issue 讨论）
-- 未来改进方向：插件化任务 / 更细颗粒权限 / 可视化监控
+- 未来改进方向：插件化条件 / 可视化监控 / API 调用支持
 
 ---
 

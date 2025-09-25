@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -183,7 +181,7 @@ async def set_config(system_access: ensure_system_access_depends, req: SystemCon
 
     if server_update:
         system_logger.info("检测到服务器配置变更，正在重启服务以应用更改...")
-        asyncio.create_task(Server.shutdown(restart=True))
+        await Server.shutdown_task(restart=True)
         return BaseResponse(data=True, message="保存成功，服务器正在重启以应用更改，请稍后重新连接")
     else:
         return BaseResponse(data=True, message="保存成功")

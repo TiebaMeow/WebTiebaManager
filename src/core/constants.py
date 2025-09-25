@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 PROGRAM_VERSION = "1.0.0"
+IS_EXE = hasattr(sys, "frozen")
 
 DEV = "dev" in sys.argv or "--dev" in sys.argv
 DEBUG = "--debug" in sys.argv
@@ -19,7 +20,7 @@ elif allow_origins_env := os.getenv("WTM_ALLOW_ORIGINS"):
 else:
     ALLOW_ORIGINS = [MAIN_SERVER]
 
-WEB_UI_CODE = os.getenv("WTM_WEB_UI_CODE", "croissant")
+WEB_UI_CODE = os.getenv("WTM_WEB_UI_CODE", "Ceylon")
 
 COOKIE_MIN_MOSAIC_LENGTH = 6
 
@@ -29,7 +30,7 @@ PID_CACHE_EXPIRE = 86400 * 7
 INVITE_CODE_EXPIRE = 86400
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(sys.executable).parent.resolve() if IS_EXE else Path(__file__).resolve().parents[2]
 BASE_DIR = Path(os.getenv("WTM_BASE_DIR", PROJECT_ROOT / "WebTMData")).resolve()
 RESOURCE_DIR = Path(os.getenv("WTM_RESOURCES_DIR", PROJECT_ROOT / "resources")).resolve()
 
