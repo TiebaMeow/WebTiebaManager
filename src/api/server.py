@@ -144,9 +144,18 @@ class Server:
                 break
 
     @classmethod
+    async def shutdown_task(cls, restart: bool = False, shutdown_timeout: int = 10):
+        """
+        创建后台任务优雅关闭服务器
+        """
+        return asyncio.create_task(cls.shutdown(restart=restart, shutdown_timeout=shutdown_timeout))
+
+    @classmethod
     async def shutdown(cls, restart: bool = False, shutdown_timeout: int = 10):
         """
         优雅关闭服务器，如果超时则强制退出
+
+        WARNING: 不应在http请求中直接调用此函数，应使用 shutdown_task，创建后台任务调用，否则会导致uvicorn无法优雅关闭
 
         Args:
             shutdown_timeout: 等待时间（秒），默认10秒
