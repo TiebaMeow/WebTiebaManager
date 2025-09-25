@@ -25,6 +25,7 @@ from fastapi import Request  # noqa: TC002
 
 
 class LogData(BaseModel):
+    # TODO 移除name字段，改为从extra中获取
     message: str
     name: str
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -42,10 +43,10 @@ class LogData(BaseModel):
         )
 
     @staticmethod
-    def from_json_message(message: dict) -> LogData:
+    def from_json_message(message: dict, name: str = "unknown") -> LogData:
         return LogData(
             message=message["record"]["message"],
-            name=message["record"]["extra"].get("name", "unknown"),
+            name=message["record"]["extra"].get("name", name),
             level=message["record"]["level"]["name"].upper(),
             extra={k: v for k, v in message["record"]["extra"].items() if k != "name"},
             time=time.strftime("%H:%M:%S", time.localtime(message["record"]["time"]["timestamp"])),
@@ -131,12 +132,7 @@ async def get_log(target_name: str, file: str):
         async with aiofiles.open(path, encoding="utf-8") as f:
             async for line in f:
                 log = json.loads(line)
-                extra = log["record"]["extra"]
-                if "name" in extra:
-                    name = extra["name"]
-                    del extra["name"]
-                else:
-                    name = "unknown"
+                name = log["record"]["extra"].get("name", "unknown")
 
                 if name != target_name and target_name != "system":
                     # 不是当前用户的日志 / 订阅者不是 system
