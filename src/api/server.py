@@ -23,6 +23,7 @@ from src.core.initialize import initialize
 from src.user.manager import UserManager
 from src.utils.logging import exception_logger, get_uvicorn_log_config, system_logger
 from src.utils.tools import random_str
+from src.utils.version import check_for_updates
 
 
 def get_log_config():
@@ -141,6 +142,8 @@ class Server:
 
     @classmethod
     async def serve(cls):
+        cls._update_task = asyncio.create_task(check_for_updates())
+
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
 
