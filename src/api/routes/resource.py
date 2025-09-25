@@ -24,8 +24,8 @@ def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
 
 
 @app.get("/resources/portrait/{portrait}", tags=["resources"])
-async def get_portrait(portrait: str) -> StreamingResponse:
-    image = await (await AnonymousAiotieba.client()).get_portrait(portrait, size="s")
+async def get_portrait(portrait: str, size: Literal["s", "m", "l"] = "s") -> StreamingResponse:
+    image = await (await AnonymousAiotieba.client()).get_portrait(portrait, size=size)
     return StreamingResponse(
         content=ndarray2image(image.img),
         media_type="image/webp",
