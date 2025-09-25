@@ -8,7 +8,16 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.config import ServerConfig
-from src.core.constants import ALLOW_ORIGINS, DEV, DEV_WEBUI, PROGRAM_VERSION, PUBLIC, SYSTEM_CONFIG_PATH, WEB_UI_CODE
+from src.core.constants import (
+    ALLOW_ORIGINS,
+    DEV,
+    DEV_WEBUI,
+    IS_EXE,
+    PROGRAM_VERSION,
+    PUBLIC,
+    SYSTEM_CONFIG_PATH,
+    WEB_UI_CODE,
+)
 from src.core.controller import Controller
 from src.core.initialize import initialize
 from src.user.manager import UserManager
@@ -107,6 +116,8 @@ class Server:
     @classmethod
     def display_startup_messages(cls, config: ServerConfig):
         system_logger.info(f"WebTiebaManager v{PROGRAM_VERSION}[{WEB_UI_CODE}]")
+        if IS_EXE:
+            system_logger.info("EXE 运行环境：如遇异常或启动失败，建议使用 Python 环境部署")
         if DEV:
             system_logger.warning("开发模式已启用，请勿在生产环境使用")
         if DEV_WEBUI:
