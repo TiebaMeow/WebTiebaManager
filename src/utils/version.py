@@ -22,6 +22,7 @@ async def get_latest_version() -> str | None:
                 else:
                     system_logger.warning("未能在Github响应中找到版本信息")
 
+    with exception_logger("获取最新版本信息失败", ignore_exceptions=(asyncio.TimeoutError,)):
         # 其次尝试从备用服务器获取最新版本
         async with session.get(f"{MAIN_SERVER}/version") as resp:
             if resp.status == 200:
