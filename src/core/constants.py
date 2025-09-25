@@ -20,7 +20,7 @@ elif allow_origins_env := os.getenv("WTM_ALLOW_ORIGINS"):
 else:
     ALLOW_ORIGINS = [MAIN_SERVER]
 
-WEB_UI_CODE = os.getenv("WTM_WEB_UI_CODE", "croissant")
+WEB_UI_CODE = os.getenv("WTM_WEB_UI_CODE", "Ceylon")
 
 COOKIE_MIN_MOSAIC_LENGTH = 6
 

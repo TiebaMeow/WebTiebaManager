@@ -15,7 +15,7 @@
 直接双击运行可执行文件，日志窗口会出现类似：
 
 ```log
-2025-09-25 11:53:30 [INFO] system | WebTiebaManager v1.0.0[croissant]
+2025-09-25 11:53:30 [INFO] system | WebTiebaManager v1.0.0[Ceylon]
 2025-09-25 11:53:30 [WARNING] system | 初始化密钥: KFCvme50
 2025-09-25 11:53:30 [WARNING] system | 检测到程序未初始化，请完成初始化
 2025-09-25 11:53:30 [INFO] system | 访问 http://localhost:36799 进行管理
