@@ -142,7 +142,7 @@ class Server:
 
     @classmethod
     async def serve(cls):
-        cls._update_task = asyncio.create_task(check_for_updates())
+        asyncio.create_task(check_for_updates())
 
         while True:
             # TODO 当需要初始化配置时，如果端口被占用，则+1
