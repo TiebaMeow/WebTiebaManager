@@ -101,7 +101,7 @@ async def create_invite_code(system_access: ensure_system_access_depends, req: U
     if not req.code:
         for _ in range(10):
             req.code = random_str(8)
-            if CodeCache.get(req.code) is None:
+            if await CodeCache.get(req.code) is None:
                 break
         else:
             raise HTTPException(status_code=500, detail="邀请码生成失败，请稍后重试")
