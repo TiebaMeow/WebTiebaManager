@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from src.api.middlewares.forwarded_ip import TrustedForwardMiddleware
 from src.core.config import ServerConfig
 from src.core.constants import (
     ALLOW_ORIGINS,
@@ -56,6 +57,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(TrustedForwardMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOW_ORIGINS,

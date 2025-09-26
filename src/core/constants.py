@@ -12,6 +12,7 @@ DEV_WEBUI = "--dev-webui" in sys.argv
 
 MAIN_SERVER = os.getenv("WTM_MAIN_SERVER", "https://webtm.tbw.icu")
 DEFAULT_SERVER_PORT = 36799
+TRUSTED_PROXIES = os.getenv("WTM_TRUSTED_PROXIES", "127.0.0.1").split(",")
 
 if DEV or DEV_WEBUI:
     ALLOW_ORIGINS = ["*"]
@@ -27,7 +28,7 @@ COOKIE_MIN_MOSAIC_LENGTH = 6
 CONFIRM_EXPIRE = 86400
 CONTENT_VALID_EXPIRE = 86400
 PID_CACHE_EXPIRE = 86400 * 7
-INVITE_CODE_EXPIRE = 86400
+INVITE_CODE_EXPIRE = 86400 * 7
 
 
 PROJECT_ROOT = Path(sys.executable).parent.resolve() if IS_EXE else Path(__file__).resolve().parents[2]
