@@ -10,6 +10,7 @@ dependencies = [
     "aiotieba>=4.6.0",
     "apscheduler>=3.11.0",
     "asyncpg>=0.30.0",
+    "brotli>=1.1.0",
     "cashews[diskcache]>=7.4.1",
     "colorama>=0.4.6",
     "fastapi>=0.116.1",

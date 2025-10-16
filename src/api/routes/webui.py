@@ -30,7 +30,7 @@ async def reverse_proxy(url: str, request: Request, raw=False):
         if raw:
             return data, resp.status, headers
 
-        for h in ["Transfer-Encoding", "Content-Encoding", "Server", "Date"]:
+        for h in ["Transfer-Encoding", "Content-Encoding", "Server", "Date", "Content-Length"]:
             headers.pop(h, None)
         return data, resp.status, headers
 
@@ -75,7 +75,6 @@ async def index(request: Request):
     content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/index.html", request)
     if Server.need_initialize():
         content = content.replace(b"</head>", b'<script>location.href="/#/initialize"</script></head>')
-        headers["Content-Length"] = str(len(content))
         headers["Cache-Control"] = "no-store"
     return Response(content=content, status_code=status_code, headers=headers)
 
