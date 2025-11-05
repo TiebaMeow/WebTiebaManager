@@ -37,10 +37,11 @@ RESOURCE_DIR = Path(os.getenv("WTM_RESOURCES_DIR", PROJECT_ROOT / "resources")).
 
 USER_DIR = BASE_DIR / "users"
 LOG_FILE_NAME = "webtm.log"
+CACHE_DIR = BASE_DIR / "cache"
 LOG_DIR = BASE_DIR / "logs"
 SYSTEM_CONFIG_PATH = BASE_DIR / "config.toml"
 
 
-for i in [LOG_DIR, USER_DIR]:
-    if not i.exists():
-        i.mkdir(parents=True)
+for directory in [LOG_DIR, USER_DIR, CACHE_DIR]:
+    if not directory.exists():
+        directory.mkdir(parents=True)
