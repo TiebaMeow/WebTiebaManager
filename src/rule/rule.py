@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from src.core.config import RuleConfig
 from src.rule.condition import ConditionGroup, Conditions
+from src.schemas.process import ConditionContext
 
 from .operation import OperationGroup, Operations
 
@@ -17,6 +18,7 @@ class Rule:
         self.manual_confirm: bool = config.manual_confirm
         self.last_modify: int = config.last_modify
         self.whitelist: bool = config.whitelist
+        self.force_record: bool = config.force_record
 
         self.operations: OperationGroup = Operations.deserialize(config.operations)  # type: ignore
         self.conditions: ConditionGroup = Conditions.deserialize(config.conditions)  # type: ignore
@@ -37,6 +39,13 @@ class Rule:
             operations=self.operations.serialize(),
             conditions=self.conditions.serialize(),
         )
+
+    async def resolve_context(self, obj: ProcessObject) -> list[ConditionContext]:
+        context = [
+            ConditionContext(type=condition.type, context=await condition.resolve_context(obj), key=None)  # type: ignore
+            for condition in self.conditions
+        ]
+        return context
 
     @property
     def valid(self):

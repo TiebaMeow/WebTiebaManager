@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
-from sqlalchemy import BIGINT, JSON, DateTime, Integer, String, Text
+from sqlalchemy import BIGINT, JSON, DateTime, Integer, PrimaryKeyConstraint, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, foreign, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
+from src.schemas.process import ConditionContext, RuleContext
 from src.schemas.tieba import Image
 
 if TYPE_CHECKING:
@@ -120,11 +121,11 @@ class ContentModel(Base):
         back_populates="contents",
         primaryjoin=lambda: UserModel.user_id == foreign(ContentModel.author_id),
     )
-    life: Mapped[LifeModel] = relationship(
-        "LifeModel",
-        back_populates="content",
-        primaryjoin=lambda: ContentModel.pid == foreign(LifeModel.pid),
-    )
+    # contexts: Mapped[list[ContextModel]] = relationship(
+    #     "ContextModel",
+    #     back_populates="content",
+    #     primaryjoin=lambda: ContentModel.pid == foreign(ContextModel.pid),
+    # )
 
     @classmethod
     def from_content(cls, content: Content) -> ContentModel:
@@ -144,18 +145,41 @@ class ContentModel(Base):
         )
 
 
-class LifeModel(Base):
-    __tablename__ = "life"
+# class LifeModel(Base):
+#     __tablename__ = "life"
 
-    pid: Mapped[int] = mapped_column(BIGINT, primary_key=True)
+#     pid: Mapped[int] = mapped_column(BIGINT, primary_key=True)
+#     tid: Mapped[int] = mapped_column(BIGINT, index=True, nullable=False)
+#     create_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+#     process_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_with_tz, nullable=False)
+#     data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+#     user: Mapped[str] = mapped_column(String(255), nullable=False)
+
+#     content: Mapped[ContentModel] = relationship(
+#         "ContentModel",
+#         back_populates="life",
+#         primaryjoin=lambda: ContentModel.pid == foreign(LifeModel.pid),
+#     )
+
+
+class ContextModel(Base):
+    __tablename__ = "context"
+    __table_args__ = (PrimaryKeyConstraint("pid", "user"),)
+
+    pid: Mapped[int] = mapped_column(BIGINT, index=True, nullable=False)
     tid: Mapped[int] = mapped_column(BIGINT, index=True, nullable=False)
+    user: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     create_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
     process_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_with_tz, nullable=False)
-    data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    user: Mapped[str] = mapped_column(String(255), nullable=False)
+    result_rule: Mapped[str] = mapped_column(String(255), nullable=True)
+    whitelist: Mapped[bool] = mapped_column(nullable=True)  # null时表示无匹配规则
+    rules: Mapped[list[RuleContext]] = mapped_column(ModelListType(RuleContext), nullable=False, default=list)
+    conditions: Mapped[list[ConditionContext]] = mapped_column(
+        ModelListType(ConditionContext), nullable=False, default=list
+    )
 
     content: Mapped[ContentModel] = relationship(
         "ContentModel",
-        back_populates="life",
-        primaryjoin=lambda: ContentModel.pid == foreign(LifeModel.pid),
+        # back_populates="contexts",
+        primaryjoin=lambda: ContextModel.pid == foreign(ContentModel.pid),
     )

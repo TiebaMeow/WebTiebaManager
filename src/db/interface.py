@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from src.core.config import DatabaseConfig
 from src.core.controller import Controller
-from src.models import Base, ContentModel, ForumModel, LifeModel, UserModel
+from src.models import Base, ContentModel, ContextModel, ForumModel, UserModel
 from src.schemas.tieba import Comment, Post
 from src.utils.logging import system_logger
 
@@ -142,7 +142,7 @@ class Database:
             return False, e
 
     @classmethod
-    async def save_items[T: (ContentModel, ForumModel, LifeModel, UserModel)](
+    async def save_items[T: (ContentModel, ForumModel, UserModel, ContextModel)](
         cls,
         items: Iterable[T],
         *,

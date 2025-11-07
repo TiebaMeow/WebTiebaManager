@@ -1,9 +1,9 @@
-from .models import Base, ContentModel, ForumModel, LifeModel, UserModel
+from .models import Base, ContentModel, ContextModel, ForumModel, UserModel
 
 __all__ = [
     "Base",
     "ContentModel",
     "ForumModel",
-    "LifeModel",
     "UserModel",
+    "ContextModel",
 ]

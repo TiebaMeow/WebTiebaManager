@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+import abc
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, TypeAdapter
@@ -11,11 +11,29 @@ if TYPE_CHECKING:
     from src.schemas.process import ProcessObject
 
 
-class ConditionTemplate(BaseModel, ABC):
+class ConditionTemplate(BaseModel, abc.ABC):
     options: Any
     priority: int = 50  # 优先级，默认50，从高到低检查
 
-    @abstractmethod
+    @property
+    def key(self) -> str | None:
+        """
+        当相同type的条件有不同的判断值时，作为区分依据
+        """
+        return None
+
+    async def resolve_context(self, obj: ProcessObject) -> str:
+        """
+        解析处理的信息，提供给日志等使用
+        """
+        return str(await self.get_value(obj))
+
+    @abc.abstractmethod
+    async def get_value(self, obj: ProcessObject) -> Any:
+        """获取用于判断的值"""
+        raise NotImplementedError
+
+    @abc.abstractmethod
     async def check(self, obj: ProcessObject) -> bool:
         raise NotImplementedError
 
