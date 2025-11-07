@@ -121,11 +121,11 @@ class ContentModel(Base):
         back_populates="contents",
         primaryjoin=lambda: UserModel.user_id == foreign(ContentModel.author_id),
     )
-    # contexts: Mapped[list[ContextModel]] = relationship(
-    #     "ContextModel",
-    #     back_populates="content",
-    #     primaryjoin=lambda: ContentModel.pid == foreign(ContextModel.pid),
-    # )
+    contexts: Mapped[list[ContextModel]] = relationship(
+        "ContextModel",
+        back_populates="content",
+        primaryjoin=lambda: ContentModel.pid == foreign(ContextModel.pid),
+    )
 
     @classmethod
     def from_content(cls, content: Content) -> ContentModel:
