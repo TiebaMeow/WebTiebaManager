@@ -30,7 +30,7 @@ async def get_overview(user: current_user_depends) -> BaseResponse[ProcessCountD
         # 查询过去24小时内所有处理日志
         result = await session.execute(
             select(ProcessLogModel.result_rule, ProcessLogModel.is_whitelist)
-            .where(ProcessLogModel.create_time >= since)
+            .where(ProcessLogModel.process_time >= since)
             .where(ProcessLogModel.user == user.username)
         )
         rows = result.all()
