@@ -27,8 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from src.core.config import DatabaseConfig
 from src.core.controller import Controller
-from src.models import Base, ContentModel, ForumModel, LifeModel, UserModel
-from src.schemas.tieba import Comment, Post
+from src.models import Base, ContentModel, ForumModel, ProcessContextModel, ProcessLogModel, UserLevelModel, UserModel
+from src.schemas.tieba import Comment, Content, Model2Content, Post, User
 from src.utils.logging import system_logger
 
 if TYPE_CHECKING:
@@ -142,7 +142,9 @@ class Database:
             return False, e
 
     @classmethod
-    async def save_items[T: (ContentModel, ForumModel, LifeModel, UserModel)](
+    async def save_items[
+        T: (ContentModel, ForumModel, UserModel, ProcessLogModel, ProcessContextModel, UserLevelModel)
+    ](
         cls,
         items: Iterable[T],
         *,
@@ -241,6 +243,79 @@ class Database:
             result = await session.execute(
                 select(ContentModel).where(ContentModel.tid == tid, ContentModel.type == "thread")
             )
+            return result.scalars().first()
+
+    @staticmethod
+    def combine_models_to_content(
+        content_model: ContentModel,
+        user_model: UserModel | None,
+        user_level_model: UserLevelModel | None,
+    ) -> Content:
+        """
+        将 ContentModel、UserModel 和 UserLevelModel 组合为 Content 对象
+        TODO 在 1.3.x 移除None的支持，强制要求提供 UserModel 和 UserLevelModel。
+        """
+        user = None
+        if user_model and user_level_model:
+            user = User(
+                user_id=user_model.user_id,
+                user_name=user_model.user_name,
+                nick_name=user_model.nick_name,
+                portrait=user_model.portrait,
+                level=user_level_model.level,
+            )
+        else:
+            user = User(user_id=0, user_name="", nick_name="", portrait="", level=0)
+            system_logger.warning(
+                f"ContentModel(pid={content_model.pid}) 缺少 UserModel 或 UserLevelModel，已使用默认 User 填充。"
+            )
+
+        formater = Model2Content.get(content_model.type)
+        if not formater:
+            raise ValueError(f"Unsupported content type: {content_model.type}")
+
+        return formater(content_model, user)
+
+    @classmethod
+    async def get_full_contents_by_pids(cls, pids: Iterable[int]) -> list[Content]:
+        pid_list = list(pids)
+        if not pid_list:
+            return []
+        async with cls.get_session() as session:
+            result = await session.execute(
+                select(ContentModel, UserModel, UserLevelModel)
+                .where(ContentModel.pid.in_(pid_list))
+                .join(UserModel, ContentModel.author_id == UserModel.user_id, isouter=True)
+                .join(
+                    UserLevelModel,
+                    (UserLevelModel.user_id == ContentModel.author_id) & (UserLevelModel.fname == ContentModel.fname),
+                    isouter=True,
+                )
+            )
+            return [cls.combine_models_to_content(model[0], model[1], model[2]) for model in result.all()]
+
+    @classmethod
+    async def get_full_content_by_pid(cls, pid: int) -> Content | None:
+        async with cls.get_session() as session:
+            result = await session.execute(
+                select(ContentModel, UserModel, UserLevelModel)
+                .where(ContentModel.pid == pid)
+                .join(UserModel, ContentModel.author_id == UserModel.user_id, isouter=True)
+                .join(
+                    UserLevelModel,
+                    (UserLevelModel.user_id == ContentModel.author_id) & (UserLevelModel.fname == ContentModel.fname),
+                    isouter=True,
+                )
+            )
+            row = result.first()
+            if row is None:
+                return None
+            return cls.combine_models_to_content(row[0], row[1], row[2])
+
+    @classmethod
+    async def get_user_by_id(cls, user_id: int) -> UserModel | None:
+        async with cls.get_session() as session:
+            result = await session.execute(select(UserModel).where(UserModel.user_id == user_id))
             return result.scalars().first()
 
     @classmethod
