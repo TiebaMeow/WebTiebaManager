@@ -1,4 +1,4 @@
-from . import initialize, log, resource, system, tieba_qrcode_login, user, webui
+from . import initialize, log, process, resource, system, tieba_qrcode_login, user, webui
 
 __all__ = [
     "initialize",
@@ -8,4 +8,5 @@ __all__ = [
     "tieba_qrcode_login",
     "user",
     "webui",
+    "process",
 ]

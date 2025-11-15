@@ -11,6 +11,8 @@ from pydantic import BaseModel
 if TYPE_CHECKING:
     import aiotieba.typing
 
+    from src.models import ContentModel
+
 
 class QrcodeStatus(Enum):
     WAITING = "WAITING"  # 等待扫码
@@ -157,6 +159,21 @@ class Thread(BaseContent, ContentInterface):
             reply_num=data.reply_num,
         )
 
+    @classmethod
+    def from_model(cls, model: ContentModel, user: User) -> Thread:
+        return cls(
+            fname=model.fname,
+            title=model.title,
+            text=model.text,
+            images=model.images,
+            create_time=int(model.create_time.timestamp()),
+            tid=model.tid,
+            pid=model.pid,
+            user=user,
+            last_time=model.last_time or 0,
+            reply_num=model.reply_num or 0,
+        )
+
     @staticmethod
     def get_images_from_aiotieba_contents(contents) -> list[Image]:
         return [
@@ -188,6 +205,21 @@ class Post(BaseContent, ContentInterface):
             floor=data.floor,
             reply_num=data.reply_num,
             user=User.from_aiotieba_data(data),
+        )
+
+    @classmethod
+    def from_model(cls, model: ContentModel, user: User) -> Post:
+        return cls(
+            fname=model.fname,
+            title=model.title,
+            text=model.text,
+            images=model.images,
+            create_time=int(model.create_time.timestamp()),
+            tid=model.tid,
+            pid=model.pid,
+            floor=model.floor,
+            reply_num=model.reply_num or 0,
+            user=user,
         )
 
     @staticmethod
@@ -224,6 +256,20 @@ class Comment(BaseContent, ContentInterface):
             user=User.from_aiotieba_data(data),
         )
 
+    @classmethod
+    def from_model(cls, model: ContentModel, user: User) -> Comment:
+        return cls(
+            fname=model.fname,
+            title=model.title,
+            text=model.text,
+            images=model.images,
+            create_time=int(model.create_time.timestamp()),
+            tid=model.tid,
+            pid=model.pid,
+            floor=model.floor,
+            user=user,
+        )
+
     @staticmethod
     def get_images_from_aiotieba_contents(contents) -> list[Image]:
         """
@@ -233,3 +279,9 @@ class Comment(BaseContent, ContentInterface):
 
 
 Content = Thread | Post | Comment
+
+Model2Content = {
+    "thread": Thread.from_model,
+    "post": Post.from_model,
+    "comment": Comment.from_model,
+}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+import abc
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, TypeAdapter
@@ -11,11 +11,50 @@ if TYPE_CHECKING:
     from src.schemas.process import ProcessObject
 
 
-class ConditionTemplate(BaseModel, ABC):
+class ConditionTemplate(BaseModel, abc.ABC):
     options: Any
     priority: int = 50  # 优先级，默认50，从高到低检查
+    _show_unprocessed: bool = False  # 私有属性，控制未处理时的显示
 
-    @abstractmethod
+    @property
+    def key(self) -> str | None:
+        """
+        当相同type的条件有不同的判断值时，作为区分依据
+        """
+        return None
+
+    async def resolve_context(self, obj: ProcessObject, processed: bool = False) -> str:
+        """
+        解析处理的信息，提供给日志等使用
+
+        Args:
+            obj (ProcessObject): 处理对象
+            processed (bool): 是否经过处理
+                即：当未被处理时，根据条件所消耗的资源决定是否进行获取
+                如果消耗大（如API调用），返回 "<unprocessed>"
+        """
+        if self._show_unprocessed and not processed:
+            return "<unprocessed>"
+        return str(await self.get_value(obj))
+
+    @property
+    def id(self) -> str:
+        """
+        同id表示context相同的condition
+        """
+        if self.key is not None:
+            return f"{self.type}:{self.key}"  # type: ignore
+        else:
+            return self.type  # type: ignore
+
+    @abc.abstractmethod
+    async def get_value(self, obj: ProcessObject) -> Any:
+        """
+        获取用于判断的值
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     async def check(self, obj: ProcessObject) -> bool:
         raise NotImplementedError
 
@@ -32,6 +71,9 @@ class ConditionGroup:
 
     def __iter__(self):
         return iter(self.conditions)
+
+    def __len__(self):
+        return len(self.conditions)
 
     def serialize(self):
         return [condition.model_dump() for condition in self.conditions]

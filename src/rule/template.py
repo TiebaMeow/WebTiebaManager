@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import abc
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -13,14 +12,14 @@ if TYPE_CHECKING:
     from src.schemas.process import ProcessObject
 
 
-class ContentConditionTemplate(abc.ABC):
+class ContentCondition(ConditionTemplate):
+    """
+    从内容中直接获取属性进行判断的Condition基类
+    """
+
     _target_attribute: str | list[str]
 
-    @abc.abstractmethod
-    async def _raw_check(self, value) -> bool:
-        raise NotImplementedError
-
-    async def check(self, obj: ProcessObject) -> bool:
+    async def get_value(self, obj: ProcessObject) -> Any:
         value = obj.content
         if isinstance(self._target_attribute, str):
             value = getattr(value, self._target_attribute)
@@ -28,7 +27,7 @@ class ContentConditionTemplate(abc.ABC):
             for attr in self._target_attribute:
                 value = getattr(value, attr)
 
-        return await self._raw_check(value)
+        return value
 
 
 class TextOptions(BaseModel):
@@ -47,11 +46,13 @@ class TextOptions(BaseModel):
             self._text = self.text.lower() if self.ignore_case else self.text
 
 
-class TextCondition(ContentConditionTemplate, ConditionTemplate):
+class TextCondition(ConditionTemplate):
     _series = "text"
     options: TextOptions
 
-    async def _raw_check(self, value: str | None) -> bool:
+    async def check(self, obj: ProcessObject) -> bool:
+        value = await self.get_value(obj)
+
         if not value:
             return False
 
@@ -84,11 +85,13 @@ class LimiterOptions(BaseModel):
             return self.min is not None
 
 
-class LimiterCondition(ContentConditionTemplate, ConditionTemplate):
+class LimiterCondition(ConditionTemplate):
     _series = "limiter"
     options: LimiterOptions
 
-    async def _raw_check(self, value: float) -> bool:
+    async def check(self, obj: ProcessObject) -> bool:
+        value = await self.get_value(obj)
+
         if self.options.max is not None and value > self.options.max:
             return False
         if self.options.min is not None and value < self.options.min:
@@ -120,11 +123,12 @@ class TimeOptions(BaseModel):
             raise ValueError("时间规则格式错误，请检查配置文件") from e
 
 
-class TimeCondition(ContentConditionTemplate, ConditionTemplate):
+class TimeCondition(ConditionTemplate):
     _series = "time"
     options: TimeOptions
 
-    async def _raw_check(self, value: int | float | str) -> bool:
+    async def check(self, obj: ProcessObject) -> bool:
+        value = await self.get_value(obj)
         if isinstance(value, str):
             value = TimeOptions.strptime(value)
         if self.options._end_timestamp is not None and value > self.options._end_timestamp:
@@ -145,11 +149,12 @@ class CheckBoxOptions[T](BaseModel):
         self._set = set(getattr(self, "values", []))
 
 
-class CheckBoxCondition[T](ContentConditionTemplate, ConditionTemplate):
+class CheckBoxCondition[T](ConditionTemplate):
     _series = "checkbox"
     options: CheckBoxOptions[T]
 
-    async def _raw_check(self, value: T) -> bool:
+    async def check(self, obj: ProcessObject) -> bool:
+        value = await self.get_value(obj)
         return value in self.options._set
 
 
@@ -161,9 +166,9 @@ class SelectOption[T](BaseModel):
         return bool(self.value)
 
 
-class SelectCondition[T](ContentConditionTemplate, ConditionTemplate):
+class SelectCondition[T](ConditionTemplate):
     _series = "select"
     options: SelectOption[T]
 
-    async def _raw_check(self, value: T) -> bool:
-        return value == self.options.value
+    async def check(self, obj: ProcessObject) -> bool:
+        return await self.get_value(obj) == self.options.value

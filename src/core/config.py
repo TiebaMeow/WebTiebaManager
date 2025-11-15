@@ -72,6 +72,7 @@ class ProcessConfig(BaseModel):
     fast_process: bool = True
     confirm_expire: int = CONFIRM_EXPIRE
     content_validate_expire: int = CONTENT_VALID_EXPIRE
+    record_all_context: bool = False
 
 
 class ForumConfig(BaseModel):
@@ -108,6 +109,7 @@ class RuleConfig(BaseModel):
     conditions: list[dict] = Field(default_factory=list, validation_alias=AliasChoices("conditions", "rules"))
     last_modify: int = 0
     whitelist: bool = False
+    force_record_context: bool = False
 
 
 class UserConfig(BaseModel):

@@ -10,7 +10,7 @@ from src.core.constants import USER_DIR
 from src.core.controller import Controller
 from src.process import Processer
 from src.rule.operation import OperationGroup
-from src.schemas.process import ProcessObject
+from src.schemas.process import ProcessObject, ProcessOptions
 from src.schemas.user import ConfirmData
 from src.tieba.info import TiebaInfo
 from src.utils.cache import ExpireCache
@@ -161,7 +161,7 @@ class User:
         需调用update_config进行初始化
         """
         self.config = config
-        self.listeners: list[EventListener] = [Controller.DispatchContent.on(self.process)]
+        self.listeners: list[EventListener] = [Controller.DispatchContent.on(self.handle_dispatch)]
         self.dir = USER_DIR / self.config.user.username
         if not self.dir.exists():
             self.dir.mkdir(parents=True)
@@ -256,7 +256,7 @@ class User:
     def save_config(self):
         write_config(self.config, self.dir / User.CONFIG_FILE)
 
-    async def process(self, content: Content):
+    async def process(self, content: Content, options: ProcessOptions | None = None):
         obj = ProcessObject(content)
         result_rule = await self.processer.process(obj)
         if result_rule:
@@ -267,7 +267,13 @@ class User:
                 uid=content.user.user_id,
                 portrait=content.user.portrait,
             )
-            await self.operate_rule(obj, result_rule)
+            if options is None or options.execute_operations:
+                await self.operate_rule(obj, result_rule, options=options)
+
+        return result_rule
+
+    async def handle_dispatch(self, content: Content):
+        await self.process(content)
 
     async def operate(self, obj: ProcessObject, og: OperationGroup):
         operations = og.operations
@@ -309,11 +315,11 @@ class User:
                 else:
                     self.logger.warning(f"未知操作：{operation.type}")
 
-    async def operate_rule(self, obj: ProcessObject, rule: Rule):
+    async def operate_rule(self, obj: ProcessObject, rule: Rule, options: ProcessOptions | None = None):
         """
         执行规则的直接操作
         """
-        if self.config.process.mandatory_confirm or rule.manual_confirm:
+        if self.config.process.mandatory_confirm or rule.manual_confirm or (options and options.need_confirm):
             if og := rule.operations.direct_operations:
                 await self.operate(obj, og)
 
