@@ -11,6 +11,7 @@ PUBLIC = "--public" in sys.argv
 DEV_WEBUI = "--dev-webui" in sys.argv
 
 MAIN_SERVER = os.getenv("WTM_MAIN_SERVER", "https://webtm.tbw.icu")
+WEBUI_SERVER = os.getenv("WTM_WEBUI_SERVER", None)
 DEFAULT_SERVER_PORT = 36799
 TRUSTED_PROXIES = os.getenv("WTM_TRUSTED_PROXIES", "127.0.0.1").split(",")
 
@@ -34,6 +35,12 @@ INVITE_CODE_EXPIRE = 86400 * 7
 PROJECT_ROOT = Path(sys.executable).parent.resolve() if IS_EXE else Path(__file__).resolve().parents[2]
 BASE_DIR = Path(os.getenv("WTM_BASE_DIR", PROJECT_ROOT / "WebTMData")).resolve()
 RESOURCE_DIR = Path(os.getenv("WTM_RESOURCES_DIR", PROJECT_ROOT / "resources")).resolve()
+
+webui_dir_env = os.getenv("WTM_WEBUI_DIR")
+WEBUI_DIR_OVERRIDE = Path(webui_dir_env).expanduser().resolve() if webui_dir_env else None
+
+webui_zip_env = os.getenv("WTM_WEBUI_ZIP")
+WEBUI_ZIP_OVERRIDE = Path(webui_zip_env).expanduser().resolve() if webui_zip_env else None
 
 USER_DIR = BASE_DIR / "users"
 LOG_FILE_NAME = "webtm.log"

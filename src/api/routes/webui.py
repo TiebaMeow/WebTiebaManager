@@ -1,12 +1,25 @@
 import asyncio
-from pathlib import Path
+import mimetypes
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 import aiofiles
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.core.constants import CACHE_DIR, DEV, MAIN_SERVER, PROGRAM_VERSION, RESOURCE_DIR, WEB_UI_CODE
+from src.core.constants import (
+    CACHE_DIR,
+    DEV,
+    MAIN_SERVER,
+    PROGRAM_VERSION,
+    RESOURCE_DIR,
+    WEB_UI_CODE,
+    WEBUI_DIR_OVERRIDE,
+    WEBUI_SERVER,
+    WEBUI_ZIP_OVERRIDE,
+)
 from src.utils.anonymous import AnonymousAiohttp
 from src.utils.logging import system_logger
 from src.utils.tools import Timer
@@ -15,11 +28,104 @@ from ..server import Server, app
 
 WEBUI_CACHE = CACHE_DIR / "webui"
 WEBUI_CACHE.mkdir(parents=True, exist_ok=True)
-WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_CODE}"
 
 DOWNLOADABLE_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
 VALID_RESOURCES = {"Sarasa-Mono-SC-Nerd.woff2"}
 downloading_resources = {}
+
+if WEBUI_SERVER:
+    WEBUI_BASE = WEBUI_SERVER.rstrip("/")
+    system_logger.info(f"使用自定义 WebUI 服务器: {WEBUI_SERVER}")
+else:
+    WEBUI_BASE = MAIN_SERVER + f"/webui/{WEB_UI_CODE}"
+
+
+LOCAL_WEBUI_DIR = None
+if WEBUI_DIR_OVERRIDE:
+    if WEBUI_DIR_OVERRIDE.is_dir():
+        LOCAL_WEBUI_DIR = WEBUI_DIR_OVERRIDE
+        system_logger.info(f"优先从本地 WebUI 目录加载资源: {WEBUI_DIR_OVERRIDE}")
+    else:
+        system_logger.warning(f"指定的 WebUI 目录不存在或不可访问: {WEBUI_DIR_OVERRIDE}")
+
+LOCAL_WEBUI_ZIP = None
+if WEBUI_ZIP_OVERRIDE:
+    if WEBUI_ZIP_OVERRIDE.is_file():
+        LOCAL_WEBUI_ZIP = WEBUI_ZIP_OVERRIDE
+        system_logger.info(f"启用 WebUI 压缩包资源: {WEBUI_ZIP_OVERRIDE}")
+    else:
+        system_logger.warning(f"指定的 WebUI 压缩包不存在或不可访问: {WEBUI_ZIP_OVERRIDE}")
+
+LOCAL_OVERRIDE_ENABLED = LOCAL_WEBUI_DIR is not None or LOCAL_WEBUI_ZIP is not None
+
+
+@dataclass
+class LocalAsset:
+    data: bytes
+    media_type: str | None
+
+
+def _normalize_relative_path(rel_path: str) -> str | None:
+    normalized = rel_path.replace("\\", "/").lstrip("/")
+    safe_path = PurePosixPath(normalized)
+    if any(part == ".." for part in safe_path.parts):
+        return None
+    return str(safe_path)
+
+
+async def _read_from_local_dir(normalized_path: str) -> LocalAsset | None:
+    if LOCAL_WEBUI_DIR is None:
+        return None
+
+    file_path = (LOCAL_WEBUI_DIR / normalized_path).resolve()
+    if not file_path.is_relative_to(LOCAL_WEBUI_DIR) or not file_path.is_file():
+        return None
+
+    async with aiofiles.open(file_path, "rb") as f:
+        data = await f.read()
+
+    media_type = mimetypes.guess_type(file_path.name)[0]
+    return LocalAsset(data=data, media_type=media_type)
+
+
+async def _read_from_zip(normalized_path: str) -> LocalAsset | None:
+    zip_path = LOCAL_WEBUI_ZIP
+    if zip_path is None:
+        return None
+
+    def _load_from_zip() -> bytes | None:
+        try:
+            with zipfile.ZipFile(zip_path, "r") as archive:
+                with archive.open(normalized_path) as file:
+                    return file.read()
+        except FileNotFoundError:
+            system_logger.error(f"WebUI 压缩包在运行时丢失: {zip_path}")
+            return None
+        except KeyError:
+            system_logger.error(f"WebUI 资源在压缩包中不存在: {normalized_path} in {zip_path}")
+            return None
+        except (zipfile.BadZipFile, OSError):
+            system_logger.error(f"WebUI 压缩包损坏或无法读取: {zip_path}")
+            return None
+
+    data = await asyncio.to_thread(_load_from_zip)
+    if data is None:
+        return None
+
+    media_type = mimetypes.guess_type(PurePosixPath(normalized_path).name)[0]
+    return LocalAsset(data=data, media_type=media_type)
+
+
+async def load_local_asset(rel_path: str) -> LocalAsset | None:
+    normalized_path = _normalize_relative_path(rel_path)
+    if not normalized_path:
+        return None
+
+    asset = await _read_from_local_dir(normalized_path)
+    if asset:
+        return asset
+
+    return await _read_from_zip(normalized_path)
 
 
 async def reverse_proxy(url: str, request: Request, raw=False):
@@ -81,6 +187,18 @@ async def download_resource(path: Path):
 async def index(request: Request):
     cache_path = WEBUI_CACHE / "index.html"
 
+    if LOCAL_OVERRIDE_ENABLED:
+        local_asset = await load_local_asset("index.html")
+        if local_asset:
+            content = local_asset.data
+            headers = {}
+
+            if Server.need_initialize():
+                content = content.replace(b"</head>", b'<script>location.href="/#/initialize"</script></head>')
+                headers["Cache-Control"] = "no-store"
+
+            return Response(content=content, media_type=local_asset.media_type or "text/html", headers=headers)
+
     try:
         content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/index.html", request)
         if status_code == 200:
@@ -106,6 +224,12 @@ async def index(request: Request):
 async def assets(path: str, request: Request):
     cache_headers = {"Cache-Control": "max-age=2592000"}
 
+    if LOCAL_OVERRIDE_ENABLED:
+        local_asset = await load_local_asset(f"assets/{path}")
+        if local_asset:
+            media_type = local_asset.media_type or "application/octet-stream"
+            return Response(content=local_asset.data, media_type=media_type, headers=cache_headers)
+
     # assets下的文件不会更新，所以优先使用本地缓存
     cache_path = WEBUI_CACHE / path
     if cache_path.exists():
@@ -123,6 +247,12 @@ async def assets(path: str, request: Request):
 
 @app.get("/favicon.ico", tags=["webui"])
 async def favicon(request: Request):
+    if LOCAL_OVERRIDE_ENABLED:
+        local_asset = await load_local_asset("favicon.ico")
+        if local_asset:
+            media_type = local_asset.media_type or "image/x-icon"
+            return Response(content=local_asset.data, media_type=media_type)
+
     content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/favicon.ico", request)
     return Response(content=content, status_code=status_code, headers=headers)
 
