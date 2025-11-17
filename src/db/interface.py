@@ -30,6 +30,7 @@ from src.core.controller import Controller
 from src.models import Base, ContentModel, ForumModel, ProcessContextModel, ProcessLogModel, UserLevelModel, UserModel
 from src.schemas.tieba import Comment, Content, Model2Content, Post, User
 from src.utils.logging import system_logger
+from src.utils.tools import Timer
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
@@ -173,60 +174,62 @@ class Database:
         if not item_list:
             return
 
-        model: type[T] = type(item_list[0])
-        if not all(isinstance(i, model) for i in item_list):
-            raise TypeError
+        with Timer() as t:
+            model: type[T] = type(item_list[0])
+            if not all(isinstance(i, model) for i in item_list):
+                raise TypeError
 
-        table = model.__table__
-        columns = list(table.columns)
-        pk_cols = [c for c in columns if c.primary_key]
-        non_pk_cols = [c for c in columns if not c.primary_key]
+            table = model.__table__
+            columns = list(table.columns)
+            pk_cols = [c for c in columns if c.primary_key]
+            non_pk_cols = [c for c in columns if not c.primary_key]
 
-        update_cols: set[str] = set()
-        if on_conflict == "upsert":
-            if exclude_columns is None:
-                update_cols = {c.name for c in non_pk_cols}
+            update_cols: set[str] = set()
+            if on_conflict == "upsert":
+                if exclude_columns is None:
+                    update_cols = {c.name for c in non_pk_cols}
+                else:
+                    exclude_set = set(exclude_columns)
+                    update_cols = {c.name for c in non_pk_cols if c.name not in exclude_set}
+                    if not update_cols:
+                        on_conflict = "ignore"
+
+            rows: list[dict] = []
+            for inst in item_list:
+                row: dict = {}
+                for c in columns:
+                    v = getattr(inst, c.name)
+                    if v is not None:
+                        row[c.name] = v
+                rows.append(row)
+
+            dialect = cls.engine.dialect.name
+            pk_names = [c.name for c in pk_cols]
+            pk_index_elems = [table.c[name] for name in pk_names]
+
+            # 分批处理
+            batches: list[list[dict]]
+            if chunk_size and chunk_size > 0 and len(rows) > chunk_size:
+                batches = [rows[i : i + chunk_size] for i in range(0, len(rows), chunk_size)]
             else:
-                exclude_set = set(exclude_columns)
-                update_cols = {c.name for c in non_pk_cols if c.name not in exclude_set}
-                if not update_cols:
-                    on_conflict = "ignore"
+                batches = [rows]
 
-        rows: list[dict] = []
-        for inst in item_list:
-            row: dict = {}
-            for c in columns:
-                v = getattr(inst, c.name)
-                if v is not None:
-                    row[c.name] = v
-            rows.append(row)
+            stmt = pg_insert(model) if dialect == "postgresql" else sqlite_insert(model)
 
-        dialect = cls.engine.dialect.name
-        pk_names = [c.name for c in pk_cols]
-        pk_index_elems = [table.c[name] for name in pk_names]
+            if on_conflict == "ignore":
+                stmt = stmt.on_conflict_do_nothing(index_elements=pk_index_elems)
+            else:  # upsert
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=pk_index_elems,
+                    set_={name: stmt.excluded[name] for name in update_cols},
+                )
 
-        # 分批处理
-        batches: list[list[dict]]
-        if chunk_size and chunk_size > 0 and len(rows) > chunk_size:
-            batches = [rows[i : i + chunk_size] for i in range(0, len(rows), chunk_size)]
-        else:
-            batches = [rows]
-
-        stmt = pg_insert(model) if dialect == "postgresql" else sqlite_insert(model)
-
-        if on_conflict == "ignore":
-            stmt = stmt.on_conflict_do_nothing(index_elements=pk_index_elems)
-        else:  # upsert
-            stmt = stmt.on_conflict_do_update(
-                index_elements=pk_index_elems,
-                set_={name: stmt.excluded[name] for name in update_cols},
-            )
-
-        async with cls.get_session() as session:
-            if stmt is not None:
-                for batch in batches:
-                    await session.execute(stmt.values(batch))
-                await session.commit()
+            async with cls.get_session() as session:
+                if stmt is not None:
+                    for batch in batches:
+                        await session.execute(stmt.values(batch))
+                    await session.commit()
+        system_logger.debug(f"[perf] 保存 {len(item_list)} 条 {model.__name__} 数据耗时: {t.cost:.2f}s")
 
     @classmethod
     async def get_contents_by_pids(cls, pids: Iterable[int]) -> list[ContentModel]:

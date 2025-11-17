@@ -8,6 +8,8 @@ from src.db import Database
 from src.models.models import SHANGHAI_TZ, ProcessContextModel, ProcessLogModel, now_with_tz
 from src.rule.rule import CheckResult, ConditionGroup, Rule
 from src.schemas.process import ConditionContext, RuleContext
+from src.utils.logging import system_logger
+from src.utils.tools import Timer
 
 if TYPE_CHECKING:
     from src.core.config import UserConfig
@@ -50,35 +52,45 @@ class Processer:
         ):
             return None
 
-        record_all_context = self.config.process.record_all_context
+        with Timer() as t:
+            record_all_context = self.config.process.record_all_context
 
-        contexts: list[ProcessRuleContext] = []
+            contexts: list[ProcessRuleContext] = []
 
-        for rule in self.whitelist_rules:
-            result = await rule.check(obj)
-            if result or record_all_context or rule.force_record_context:
-                contexts.append(ProcessRuleContext.from_rule(rule, result))
+            for rule in self.whitelist_rules:
+                result = await rule.check(obj)
+                if result or record_all_context or rule.force_record_context:
+                    contexts.append(ProcessRuleContext.from_rule(rule, result))
 
-            if result:
-                # TODO 逻辑考虑 当fast_process设为false时，是否继续检查后续规则
-                await self.resolve(obj, contexts, result_rule=rule)
-                return None
-
-        valid_rule = None
-        for rule in self.rules:
-            result = await rule.check(obj)
-            if result or record_all_context or rule.force_record_context:
-                contexts.append(ProcessRuleContext.from_rule(rule, result))
-
-            if result:
-                if self.config.process.fast_process:
+                if result:
+                    # TODO 逻辑考虑 当fast_process设为false时，是否继续检查后续规则
                     await self.resolve(obj, contexts, result_rule=rule)
-                    return rule
-                if valid_rule is None:
-                    valid_rule = rule
+                    system_logger.debug(
+                        f"[perf] 用户 {self.config.user.username} 处理对象 {obj.content.pid} 命中白名单规则 {rule.name}，耗时: {t.cost:.2f}s"
+                    )
+                    return None
 
-        await self.resolve(obj, contexts, result_rule=valid_rule)
-        return valid_rule
+            valid_rule = None
+            for rule in self.rules:
+                result = await rule.check(obj)
+                if result or record_all_context or rule.force_record_context:
+                    contexts.append(ProcessRuleContext.from_rule(rule, result))
+
+                if result:
+                    if self.config.process.fast_process:
+                        await self.resolve(obj, contexts, result_rule=rule)
+                        system_logger.debug(
+                            f"[perf] 用户 {self.config.user.username} 处理对象 {obj.content.pid} 命中规则 {rule.name}，耗时: {t.cost:.2f}s"
+                        )
+                        return rule
+                    if valid_rule is None:
+                        valid_rule = rule
+
+            await self.resolve(obj, contexts, result_rule=valid_rule)
+            system_logger.debug(
+                f"[perf] 用户 {self.config.user.username} 处理对象 {obj.content.pid} {'命中规则 ' + valid_rule.name if valid_rule else '未命中规则'}，耗时: {t.cost:.2f}s"
+            )
+            return valid_rule
 
     async def resolve(
         self,

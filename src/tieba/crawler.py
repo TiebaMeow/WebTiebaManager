@@ -124,65 +124,77 @@ class Spider:
         scan = Controller.config.scan
         raw_threads: list[aiotieba.typing.Thread] = []
         # 获取主题列表
-        for i in range(1, scan.thread_page_forward + 1):
-            async with self.eta:
-                raw_threads.extend(await self.client.get_threads(forum, pn=i))
+        with Timer() as t:
+            for i in range(1, scan.thread_page_forward + 1):
+                async with self.eta:
+                    raw_threads.extend(await self.client.get_threads(forum, pn=i))
+        system_logger.debug(f"[perf] 爬取贴吧 {forum} 的 {len(raw_threads)} 个主题帖耗时: {t.cost:.2f}s")
 
         for thread in raw_threads:
-            updated = await Database.check_and_update_cache(thread)
+            with Timer() as t_thread:
+                updated = await Database.check_and_update_cache(thread)
 
-            # NEW or NEW_WITH_CHILD
-            if updated & UpdateStatus.IS_NEW and need.thread:
-                yield Thread.from_aiotieba_data(thread)
+                # NEW or NEW_WITH_CHILD
+                if updated & UpdateStatus.IS_NEW and need.thread:
+                    yield Thread.from_aiotieba_data(thread)
 
-            # UNCHANGED or NEW
-            if updated & UpdateStatus.IS_STABLE or (not need.post and not need.comment):
-                continue
+                # UNCHANGED or NEW
+                if updated & UpdateStatus.IS_STABLE or (not need.post and not need.comment):
+                    continue
 
-            # UPDATED or NEW_WITH_CHILD
+                # UPDATED or NEW_WITH_CHILD
 
-            raw_posts: list[Post] = []
-            raw_comments: list[Comment] = []
+                raw_posts: list[Post] = []
+                raw_comments: list[Comment] = []
 
-            async with self.eta:
-                data = await self.browser.get_posts(thread.tid, pn=1)
+                with Timer() as t_posts:
+                    async with self.eta:
+                        data = await self.browser.get_posts(thread.tid, pn=1)
 
-                total_page = data.total_page
-                # 优化页码遍历逻辑
-                pages = list(range(2, min(scan.post_page_forward + 1, total_page + 1)))
-                if total_page < scan.post_page_forward + scan.post_page_backward:
-                    pages += list(range(len(pages) + 2, total_page + 1))
-                else:
-                    pages += list(
-                        range(total_page, max(total_page - scan.post_page_backward, scan.post_page_forward), -1)
+                        total_page = data.total_page
+                        # 优化页码遍历逻辑
+                        pages = list(range(2, min(scan.post_page_forward + 1, total_page + 1)))
+                        if total_page < scan.post_page_forward + scan.post_page_backward:
+                            pages += list(range(len(pages) + 2, total_page + 1))
+                        else:
+                            pages += list(
+                                range(total_page, max(total_page - scan.post_page_backward, scan.post_page_forward), -1)
+                            )
+
+                        for i in pages:
+                            async with self.eta:
+                                data = await self.browser.get_posts(thread.tid, pn=i)
+                                raw_posts.extend(data.posts)
+                                raw_comments.extend(data.comments)
+                system_logger.debug(
+                    f"[perf] 爬取主题帖 {thread.tid} 的 {len(raw_posts)} 个回帖和 {len(raw_comments)} 个楼中楼耗时: {t_posts.cost:.2f}s"
+                )
+
+                for post in raw_posts:
+                    if post.floor == 1:
+                        continue
+                    updated = await Database.check_and_update_cache(post)
+
+                    if updated & UpdateStatus.IS_NEW and need.post:
+                        yield post
+
+                    if updated & UpdateStatus.IS_STABLE or not need.post:
+                        continue
+
+                    target_pn = (post.reply_num + 29) // 30
+                    with Timer() as t_comments:
+                        async with self.eta:
+                            comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
+                            raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
+                    system_logger.debug(
+                        f"[perf] 爬取回帖 {post.pid} 的 {len(comments)} 个楼中楼耗时: {t_comments.cost:.2f}s"
                     )
 
-                for i in pages:
-                    async with self.eta:
-                        data = await self.browser.get_posts(thread.tid, pn=i)
-                        raw_posts.extend(data.posts)
-                        raw_comments.extend(data.comments)
-
-            for post in raw_posts:
-                if post.floor == 1:
-                    continue
-                updated = await Database.check_and_update_cache(post)
-
-                if updated & UpdateStatus.IS_NEW and need.post:
-                    yield post
-
-                if updated & UpdateStatus.IS_STABLE or not need.post:
-                    continue
-
-                target_pn = (post.reply_num + 29) // 30
-                async with self.eta:
-                    comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
-                    raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
-
-                for comment in raw_comments:
-                    updated = await Database.check_and_update_cache(comment)
-                    if updated & UpdateStatus.IS_NEW and need.comment:
-                        yield comment
+                    for comment in raw_comments:
+                        updated = await Database.check_and_update_cache(comment)
+                        if updated & UpdateStatus.IS_NEW and need.comment:
+                            yield comment
+            system_logger.debug(f"[perf] 处理主题帖 {thread.tid} 耗时: {t_thread.cost:.2f}s")
 
 
 class Crawler:
@@ -263,8 +275,9 @@ class Crawler:
         while True:
             users: dict[int, UserModel] = {}
             user_levels: dict[str, UserLevelModel] = {}  # user_id:fname -> UserLevelModel
+            contents: list[ContentModel] = []
 
-            with exception_logger("爬虫任务发生异常"):
+            with exception_logger("爬虫任务发生异常"), Timer() as t:
                 for forum, need in cls.needs.items():
                     async for content in cls.get_spider().crawl(forum, need):
                         system_logger.debug(f"爬取到新内容. {content.mark} 来自 {forum}")
@@ -278,17 +291,20 @@ class Crawler:
                                 fname=forum,
                                 level=content.user.level,
                             )
-
-                        # TODO 优化插入逻辑，使得content能在爬取结束后批量插入
-                        # note 规则判断依赖已插入数据库的内容，需要再判断前插入
-                        await Database.save_items([ContentModel.from_content(content)])
-
+                        contents.append(ContentModel.from_content(content))
                         await Controller.DispatchContent.broadcast(content)
 
-            with exception_logger("爬虫用户数据保存发生异常"):
+            system_logger.debug(f"[perf] 爬虫任务完成，共爬取 {len(contents)} 条内容，耗时: {t.cost:.2f}s")
+
+            with exception_logger("爬虫用户数据保存发生异常"), Timer() as t:
                 # TODO 理论上存在处理过程中的user model获取请求 (ProcessLog模块)，目前就先这样把 <
                 await Database.save_items(users.values())
                 await Database.save_items(user_levels.values())
+                await Database.save_items(contents)
+
+            system_logger.debug(
+                f"[perf] 保存 {len(users)} 个用户、{len(user_levels)} 个用户等级、{len(contents)} 条内容耗时: {t.cost:.2f}s"
+            )
 
             await asyncio.sleep(Controller.config.scan.loop_cd)
 
