@@ -9,10 +9,30 @@ from sqlalchemy import func, select
 from src.db import Database
 from src.models import ProcessContextModel, ProcessLogModel
 from src.schemas.process import ConditionContext, ProcessOptions, RuleContext
-from src.schemas.tieba import Content
+from src.schemas.tieba import Content, Post, User
 
 from ..auth import current_user_depends
 from ..server import BaseResponse, app
+
+UNKNOWN_CONTENT = Post(
+    pid=0,
+    tid=0,
+    floor=0,
+    title="未知内容",
+    user=User(user_id=0, user_name="未知用户", portrait="", nick_name="未知用户", level=0),
+    fname="未知",
+    reply_num=0,
+    create_time=0,
+    text="该内容可能因为程序错误而丢失，无法显示具体信息。",
+    images=[],
+)
+
+
+def make_unknown_content(pid: int, tid: int = 0) -> Content:
+    copy = UNKNOWN_CONTENT.model_copy()
+    copy.pid = pid
+    copy.tid = tid
+    return copy
 
 
 class ProcessCountData(BaseModel):
@@ -84,10 +104,9 @@ async def attach_content(logs: list[ProcessLogModel]) -> list[ProcessData]:
             result_rule=log.result_rule,
             process_time=int(log.process_time.timestamp()),
             is_whitelist=log.is_whitelist or False,
-            content=pid_to_content[log.pid],
+            content=pid_to_content[log.pid] if log.pid in pid_to_content else make_unknown_content(log.pid, log.tid),
         )
         for log in logs
-        if log.pid in pid_to_content
     ]
 
 
@@ -182,18 +201,16 @@ async def get_process_detail(pid: int, user: current_user_depends) -> BaseRespon
     data = await query_process_context(pid, user)
 
     if not data:
-        return BaseResponse(data=None)
+        raise HTTPException(status_code=404, detail="处理记录未找到")
 
     content = await Database.get_full_content_by_pid(pid)
-    if not content:
-        return BaseResponse(data=None)
 
     return BaseResponse(
         data=ProcessContextData(
             result_rule=data[0].result_rule,
             is_whitelist=data[0].is_whitelist or False,
             process_time=int(data[0].process_time.timestamp()),
-            content=content,
+            content=content or make_unknown_content(pid, data[0].tid),
             rules=data[1].rules,
             conditions=data[1].conditions,
         )
