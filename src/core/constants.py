@@ -43,6 +43,7 @@ webui_zip_env = os.getenv("WTM_WEBUI_ZIP")
 WEBUI_ZIP_OVERRIDE = Path(webui_zip_env).expanduser().resolve() if webui_zip_env else None
 
 USER_DIR = BASE_DIR / "users"
+PLUGIN_DIR = PROJECT_ROOT / "plugins"
 LOG_FILE_NAME = "webtm.log"
 CACHE_DIR = BASE_DIR / "cache"
 LOG_DIR = BASE_DIR / "logs"
