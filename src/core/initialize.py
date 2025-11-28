@@ -5,6 +5,7 @@ from src.utils.anonymous import stop_anonymous_clients
 from src.utils.cache import CacheCleaner
 
 from .controller import Controller
+from .plugin import load_plugins
 
 
 def initialize():
@@ -22,3 +23,5 @@ def initialize():
         Controller.Stop.on(stop_anonymous_clients)
         UserManager.UserChange.on(Crawler.update_needs)
         UserManager.UserConfigChange.on(Crawler.update_needs)
+
+        load_plugins()
