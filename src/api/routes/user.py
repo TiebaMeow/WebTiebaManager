@@ -7,7 +7,8 @@ from pydantic import BaseModel
 
 from src.core.config import ForumConfig, ProcessConfig, RuleConfig  # noqa: TC001
 from src.rule.condition import Conditions
-from src.schemas.rule import ConditionInfo  # noqa: TC001
+from src.rule.operation import Operations
+from src.schemas.rule import ConditionInfo, OperationInfo  # noqa: TC001
 
 # 不要将下方的导入移动到TYPE_CHECKING中，否则会导致fastapi无法正确生处理请求
 from src.schemas.user import ConfirmSimpleData, UserPermission  # noqa: TC001
@@ -105,9 +106,19 @@ async def set_user_config(
     return BaseResponse(data=True)
 
 
+class RuleInfoResponse(BaseModel):
+    conditions: list[ConditionInfo]
+    operations: list[OperationInfo]
+
+
 @app.get("/api/rule/info", tags=["rule"])
-async def get_condition_info(user: current_user_depends) -> BaseResponse[list[ConditionInfo]]:
-    return BaseResponse(data=list(Conditions.condition_info.values()))
+async def get_condition_info(user: current_user_depends) -> BaseResponse[RuleInfoResponse]:
+    return BaseResponse(
+        data=RuleInfoResponse(
+            conditions=list(Conditions.condition_info.values()),
+            operations=list(Operations.operation_info.values()),
+        )
+    )
 
 
 @app.get("/api/rule/get", tags=["rule"])

@@ -5,7 +5,7 @@ from .content_condition import (
     CreateTimeCondition,
     FloorCondition,
 )
-from .operation import Operations
+from .operation import Operations, OperationTemplate
 from .option import OptionDescMaker
 from .user_condition import (
     IpCondition,

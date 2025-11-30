@@ -102,10 +102,9 @@ class TiebaClient:
     async def _delete_post(self, fname: str, tid: int, pid: int):
         return await self.client.del_post(fname, tid=tid, pid=pid)
 
-    async def delete(self, content: Content):
-        self.logger.info(f"正在删除 {content.mark}", tid=content.tid, pid=content.pid)
+    async def delete(self, content: Content, del_thread: bool = False):
         try:
-            if content.type == "thread":
+            if content.type == "thread" or del_thread:
                 result = await self._delete_thread(content.fname, tid=content.tid)
             else:
                 result = await self._delete_post(content.fname, tid=content.tid, pid=content.pid)
@@ -117,10 +116,11 @@ class TiebaClient:
             self.logger.warning(f"删除 {content.mark} 失败，原因: {result.err}", tid=content.tid, pid=content.pid)
             return False
 
+        self.logger.info(f"删除 {content.mark}", tid=content.tid, pid=content.pid)
+
         return True
 
     async def block(self, content: Content, day: int = 1, reason: str = ""):
-        self.logger.info(f"封禁 {content.user.log_name}", uid=content.user.user_id, portrait=content.user.portrait)
         try:
             result = await self.client.block(content.fname, content.user.portrait, day=day, reason=reason)
         except TiebaClient.InvalidClientError:
@@ -138,6 +138,8 @@ class TiebaClient:
                 portrait=content.user.portrait,
             )
             return False
+
+        self.logger.info(f"封禁 {content.user.log_name}", uid=content.user.user_id, portrait=content.user.portrait)
 
         return True
 
@@ -299,21 +301,7 @@ class User:
                 raise ValueError(f"Unknown operation: {operations}")
         else:
             for operation in operations:
-                if operation.type == "delete":
-                    if operation.options.delete_thread_if_author:
-                        if await TiebaInfo.get_if_thread_author(obj):
-                            await self.client.delete(obj.content)
-                            continue
-
-                    await self.client.delete(obj.content)
-                elif operation.type == "block":
-                    await self.client.block(
-                        obj.content,
-                        operation.options.day or self.config.forum.block_day,
-                        operation.options.reason or self.config.forum.block_reason,
-                    )
-                else:
-                    self.logger.warning(f"未知操作：{operation.type}")
+                await operation.operate(obj, self)
 
     async def operate_rule(self, obj: ProcessObject, rule: Rule, options: ProcessOptions | None = None):
         """
