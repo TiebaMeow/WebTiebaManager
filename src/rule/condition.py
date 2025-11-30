@@ -10,11 +10,14 @@ from src.schemas.rule import ConditionInfo
 if TYPE_CHECKING:
     from src.schemas.process import ProcessObject
 
+    from .option import OptionDesc
+
 
 class ConditionTemplate(BaseModel, abc.ABC):
     options: Any
     priority: int = 50  # 优先级，默认50，从高到低检查
     _show_unprocessed: bool = False  # 私有属性，控制未处理时的显示
+    _option_descs: list[OptionDesc] | None = None  # 私有属性，表示参数信息，仅在series不填写时启用
 
     @property
     def key(self) -> str | None:
@@ -126,7 +129,30 @@ class Conditions:
             try:
                 condition_type = default_condition.type  # type: ignore
             except AttributeError as e:
-                raise Exception("条件类型未定义") from e
+                raise AttributeError("条件类型未定义") from e
+
+            series = getattr(default_condition, "_series", "custom")
+            if series == "custom":
+                if default_condition._option_descs is None:
+                    # 自定义条件 {name} 未定义参数信息，加载失败
+                    raise ValueError(f"自定义条件 {name} 未定义参数信息，加载失败")
+                else:
+                    defined_option_keys: set[str] = set(default_condition.options.model_fields.keys())
+                    option_desc_keys: set[str] = set()
+                    for desc in default_condition._option_descs:
+                        if desc.key in option_desc_keys:
+                            raise ValueError(f"自定义条件 {name} 定义了重复的参数信息: {desc.key}")
+
+                        option_desc_keys.add(desc.key)
+
+                    if defined_option_keys - option_desc_keys:
+                        raise ValueError(
+                            f"自定义条件 {name} 的参数信息不完整，缺少参数 {defined_option_keys - option_desc_keys} 的信息"
+                        )
+                    elif option_desc_keys - defined_option_keys:
+                        raise ValueError(
+                            f"自定义条件 {name} 缺少定义的参数，参数 {option_desc_keys - defined_option_keys} 未在options中定义"
+                        )
 
             cls.condition_dict[condition_type] = condition  # type: ignore
             cls.condition_info[condition_type] = ConditionInfo(
@@ -134,8 +160,9 @@ class Conditions:
                 name=name,
                 category=category,
                 description=description,
-                series=getattr(default_condition, "_series", "custom"),
+                series=series,
                 values=values,
+                option_descs=default_condition._option_descs,
             )
 
             return condition
