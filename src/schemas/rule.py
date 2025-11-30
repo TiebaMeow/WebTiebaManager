@@ -1,4 +1,32 @@
-from pydantic import BaseModel
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class BaseDesc(BaseModel):
+    key: str
+    label: str
+    placeholder: str | None = None
+    default: Any = None
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class InputDesc(BaseDesc):
+    type: Literal["input"] = "input"
+    default: str = ""
+
+
+class NumberDesc(BaseDesc):
+    type: Literal["number"] = "number"
+    default: int | None = None
+
+
+class CheckBoxDesc(BaseDesc):
+    type: Literal["checkbox"] = "checkbox"
+    default: bool = False
+
+
+OptionDesc = InputDesc | NumberDesc | CheckBoxDesc
 
 
 class ConditionInfo(BaseModel):
@@ -19,3 +47,4 @@ class ConditionInfo(BaseModel):
     description: str
     series: str
     values: dict[str, str] | None = None
+    option_descs: None | list[OptionDesc] = None
