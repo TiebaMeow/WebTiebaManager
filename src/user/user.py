@@ -308,10 +308,15 @@ class User:
         执行规则的直接操作
         """
         if self.config.process.mandatory_confirm or rule.manual_confirm or (options and options.need_confirm):
-            if og := rule.operations.direct_operations:
-                await self.operate(obj, og)
+            if options and options.need_confirm:
+                # 当通过参数强制确认时，不执行（即使设置了direct=True）
+                og = rule.operations
 
-            og = rule.operations.no_direct_operations
+            else:
+                if direct_og := rule.operations.direct_operations:
+                    await self.operate(obj, direct_og)
+
+                og = rule.operations.no_direct_operations
 
             if og:
                 data = {}
