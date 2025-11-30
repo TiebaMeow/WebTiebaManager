@@ -28,7 +28,7 @@ class LogData(BaseModel):
     # TODO 移除name字段，改为从extra中获取
     message: str
     name: str
-    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "SUCCESS"]
     extra: dict
     time: str
 
