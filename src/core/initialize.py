@@ -10,6 +10,8 @@ from .plugin import load_plugins
 
 def initialize():
     if Controller.initialize():
+        from src.api.routes.resource import ResourceAPIExecutorManager
+
         Controller.Start.on(UserManager.load_users)
         Controller.Start.on(Database.startup)
         Controller.Start.on(CacheCleaner.start)
@@ -23,5 +25,6 @@ def initialize():
         Controller.Stop.on(stop_anonymous_clients)
         UserManager.UserChange.on(Crawler.update_needs)
         UserManager.UserConfigChange.on(Crawler.update_needs)
+        Controller.Stop.on(ResourceAPIExecutorManager.shutdown_executor)
 
         load_plugins()
