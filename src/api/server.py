@@ -237,5 +237,6 @@ class Server:
 
                     loop = asyncio.get_event_loop()
                     loop.run_until_complete(cls.serve())
+
         except KeyboardInterrupt:
             system_logger.info("服务已停止")
