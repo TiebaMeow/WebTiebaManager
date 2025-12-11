@@ -46,6 +46,7 @@ def _wrap_function(func):
 
     # 包装时调用外层可调用对象以保留被装饰器包装的语义
     if inspect.iscoroutinefunction(wrapped_callable):
+
         @wraps(wrapped_callable)
         async def _async_wrapper(*args, __orig=wrapped_callable, **kwargs):
             print(f"run {_fname} {_ffile}:{_flineno}")
