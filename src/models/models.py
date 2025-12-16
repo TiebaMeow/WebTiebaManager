@@ -94,8 +94,8 @@ class UserLevelModel(Base):
     level: Mapped[int] = mapped_column(Integer, nullable=False)
 
     @classmethod
-    def from_level(cls, user_id: int, fname: str, level: int) -> UserLevelModel:
-        return cls(user_id=user_id, fname=fname, level=level)
+    def from_content(cls, content: Content) -> UserLevelModel:
+        return cls(user_id=content.user.user_id, fname=content.fname, level=content.user.level)
 
 
 class ContentModel(Base):
