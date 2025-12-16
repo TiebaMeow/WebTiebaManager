@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import aiotieba
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from src.core.constants import PID_CACHE_EXPIRE
 from src.core.controller import Controller
@@ -262,22 +263,23 @@ class Crawler:
     async def crawl(cls):
         while True:
             users: dict[int, UserModel] = {}
-            user_levels: dict[str, UserLevelModel] = {}  # user_id:fname -> UserLevelModel
+            need_update_levels: list[UserLevelModel] = []
 
             with exception_logger("爬虫任务发生异常"):
                 for forum, need in cls.needs.items():
+                    user_levels: dict[int, UserLevelModel] = {}
+
                     async for content in cls.get_spider().crawl(forum, need):
                         system_logger.debug(f"爬取到新内容. {content.mark} 来自 {forum}")
 
                         if content.user.user_id not in users:
                             users[content.user.user_id] = UserModel.from_user(content.user)
-                        level_identifier = f"{content.user.user_id}:{forum}"
-                        if level_identifier not in user_levels:
-                            user_levels[level_identifier] = UserLevelModel(
-                                user_id=content.user.user_id,
-                                fname=forum,
-                                level=content.user.level,
-                            )
+
+                        if content.user.user_id not in user_levels:
+                            user_levels[content.user.user_id] = UserLevelModel.from_content(content)
+                        else:
+                            ulm = user_levels[content.user.user_id]
+                            ulm.level = max(ulm.level, content.user.level)
 
                         # TODO 优化插入逻辑，使得content能在爬取结束后批量插入
                         # note 规则判断依赖已插入数据库的内容，需要再判断前插入
@@ -285,10 +287,30 @@ class Crawler:
 
                         await Controller.DispatchContent.broadcast(content)
 
+                    user_level_ids = list(user_levels.keys())
+                    async with Database.get_session() as session:
+                        if user_level_ids:
+                            async with Database.get_session() as session:
+                                result = await session.execute(
+                                    select(UserLevelModel)
+                                    .where(UserLevelModel.fname == forum)
+                                    .where(UserLevelModel.user_id.in_(user_level_ids))
+                                )
+                                existing_levels = {ulm.user_id: ulm for ulm in result.scalars().all()}
+                        else:
+                            existing_levels = {}
+
+                    for ulm in user_levels.values():
+                        if ulm.user_id in existing_levels:
+                            if ulm.level > existing_levels[ulm.user_id].level:
+                                need_update_levels.append(ulm)
+                        else:
+                            need_update_levels.append(ulm)
+
             with exception_logger("爬虫用户数据保存发生异常"):
                 # TODO 理论上存在处理过程中的user model获取请求 (ProcessLog模块)，目前就先这样把 <
                 await Database.save_items(users.values())
-                await Database.save_items(user_levels.values())
+                await Database.save_items(need_update_levels)
 
             await asyncio.sleep(Controller.config.scan.loop_cd)
 
