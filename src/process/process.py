@@ -21,7 +21,7 @@ class ProcessRuleContext:
     whitelist: bool
     result: bool
     conditions: ConditionGroup
-    failed_step: int | None = None
+    failed_steps: int | list[int] | None = None
 
     @classmethod
     def from_rule(cls, rule: Rule, check_result: CheckResult) -> ProcessRuleContext:
@@ -29,7 +29,7 @@ class ProcessRuleContext:
             name=rule.name,
             whitelist=rule.whitelist,
             result=check_result.result,
-            failed_step=check_result.failed_step,
+            failed_steps=check_result.failed_steps,
             conditions=rule.conditions,
         )
 
@@ -109,14 +109,12 @@ class Processer:
 
         for rule_context in contexts:
             condition_indices = []
-            processed_until = (
-                rule_context.failed_step if rule_context.failed_step is not None else len(rule_context.conditions)
-            )
+            processed_until = rule_context.failed_steps if isinstance(rule_context.failed_steps, int) else -1
 
             for i, condition in enumerate(rule_context.conditions):
                 identifier = condition.id
 
-                if i <= processed_until:
+                if i <= processed_until or processed_until == -1:
                     processed_conditions.add(identifier)
 
                 if identifier not in condition_identifier_set:
@@ -132,7 +130,7 @@ class Processer:
                     whitelist=rule_context.whitelist,
                     result=rule_context.result,
                     conditions=condition_indices,
-                    failed_step=rule_context.failed_step,
+                    failed_steps=rule_context.failed_steps,
                 )
             )
 
