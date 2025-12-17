@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class CheckResult(BaseModel):
     result: bool
-    failed_step: int | None = None
+    failed_steps: int | list[int] | None = None
 
     def __bool__(self):
         return self.result
@@ -36,7 +36,7 @@ class Rule:
     async def check(self, obj: ProcessObject) -> CheckResult:
         for i, condition in enumerate(self.conditions):
             if not await condition.check(obj):
-                return CheckResult(result=False, failed_step=i)
+                return CheckResult(result=False, failed_steps=i)
 
         return CheckResult(result=True)
 
