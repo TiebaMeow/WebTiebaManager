@@ -8,6 +8,9 @@ from pydantic import BaseModel, TypeAdapter
 from src.schemas.rule import ConditionInfo
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from src.core.config import RuleLogic
     from src.schemas.process import ProcessObject
 
     from .option import OptionDesc
@@ -67,16 +70,22 @@ class ConditionTemplate(BaseModel, abc.ABC):
 
 
 class ConditionGroup:
-    def __init__(self, conditions: list[ConditionTemplate]) -> None:
-        self.conditions: list[ConditionTemplate] = sorted(
-            (i for i in conditions if i.valid), key=lambda x: x.priority, reverse=True
+    def __init__(self, conditions: list[ConditionTemplate], logic: RuleLogic | None = None) -> None:
+        high_priority_conditions = logic.priority_groups[0] if logic else []
+        order = list(range(len(conditions)))
+        order.sort(
+            key=lambda x: conditions[x].priority + 0.5 if x in high_priority_conditions else conditions[x].priority,
+            reverse=True,
         )
+        self.order = [i for i in order if conditions[i].valid]
+        self.conditions: list[ConditionTemplate] = conditions
 
-    def __iter__(self):
-        return iter(self.conditions)
+    def __iter__(self) -> Iterator[tuple[int, ConditionTemplate]]:
+        for i in self.order:
+            yield i, self.conditions[i]
 
     def __len__(self):
-        return len(self.conditions)
+        return len(self.order)
 
     def serialize(self):
         return [condition.model_dump() for condition in self.conditions]
@@ -189,9 +198,9 @@ class Conditions:
         return _
 
     @classmethod
-    def deserialize(cls, condition_config: list[dict]) -> ConditionGroup:
+    def deserialize(cls, condition_config: list[dict], logic: RuleLogic | None = None) -> ConditionGroup:
         if cls.condition_classes:
             adapter = TypeAdapter(cls.condition_classes)
-            return ConditionGroup([adapter.validate_python(i) for i in condition_config])
+            return ConditionGroup([adapter.validate_python(i) for i in condition_config], logic=logic)
         else:
             return ConditionGroup([])
