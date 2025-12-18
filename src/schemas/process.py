@@ -13,7 +13,9 @@ class RuleContext(BaseModel):
     whitelist: bool
     result: bool
     conditions: list[int]
-    failed_steps: int | list[int] | None = None  # 失败的条件步骤索引列表，若为整数则表示第一个失败的条件
+    step_status: int | list[list[int]] | None = (
+        None  # int: 失败步骤索引，list[list[int]]: [成功步骤, 失败步骤]，None: 全部成功 / 未经处理
+    )
 
 
 class ConditionContext(BaseModel):

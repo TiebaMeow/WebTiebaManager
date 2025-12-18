@@ -21,7 +21,9 @@ class ProcessRuleContext:
     whitelist: bool
     result: bool
     conditions: ConditionGroup
-    failed_steps: int | list[int] | None = None
+    step_status: int | list[list[int]] | None = (
+        None  # int: 失败步骤索引，list[list[int]]: [成功步骤, 失败步骤]，None: 全部成功 / 未经处理
+    )
 
     @classmethod
     def from_rule(cls, rule: Rule, check_result: CheckResult) -> ProcessRuleContext:
@@ -29,7 +31,7 @@ class ProcessRuleContext:
             name=rule.name,
             whitelist=rule.whitelist,
             result=check_result.result,
-            failed_steps=check_result.failed_steps,
+            step_status=check_result.step_status,
             conditions=rule.conditions,
         )
 
@@ -109,12 +111,29 @@ class Processer:
 
         for rule_context in contexts:
             condition_indices = []
-            processed_until = rule_context.failed_steps if isinstance(rule_context.failed_steps, int) else -1
 
-            for i, condition in enumerate(rule_context.conditions):
+            # 处理 processed_conditions 逻辑，兼容 step_status 三种类型
+            processed_success = set()
+            processed_failed = set()
+            if isinstance(rule_context.step_status, int):
+                # 之前的为成功，当前为失败，后续未处理
+                processed_success = set(range(rule_context.step_status)) if rule_context.step_status > 0 else set()
+                processed_failed = {rule_context.step_status}
+            elif isinstance(rule_context.step_status, list):
+                # [成功步骤, 失败步骤]
+                if len(rule_context.step_status) == 2:
+                    processed_success = set(rule_context.step_status[0])
+                    processed_failed = set(rule_context.step_status[1])
+            elif rule_context.step_status is None:
+                # 全部成功
+                processed_success = set(range(len(rule_context.conditions)))
+
+            for i, (_, condition) in enumerate(rule_context.conditions):
                 identifier = condition.id
 
-                if i <= processed_until or processed_until == -1:
+                if i in processed_success or rule_context.step_status is None:
+                    processed_conditions.add(identifier)
+                elif i in processed_failed:
                     processed_conditions.add(identifier)
 
                 if identifier not in condition_identifier_set:
@@ -130,7 +149,7 @@ class Processer:
                     whitelist=rule_context.whitelist,
                     result=rule_context.result,
                     conditions=condition_indices,
-                    failed_steps=rule_context.failed_steps,
+                    step_status=rule_context.step_status,
                 )
             )
 
