@@ -1,5 +1,6 @@
 import aiohttp
 import aiotieba
+from tiebameow.client import Client as TiebaMeowClient
 
 
 class AnonymousAiohttp:
@@ -38,3 +39,12 @@ class AnonymousAiotieba:
 async def stop_anonymous_clients(_=None):
     await AnonymousAiohttp.stop()
     await AnonymousAiotieba.stop()
+
+
+class AnnoymousTiebaMeow(AnonymousAiotieba):
+    @classmethod
+    async def client(cls):
+        if not cls._client:
+            cls._client = TiebaMeowClient()
+            await cls._client.__aenter__()
+        return cls._client

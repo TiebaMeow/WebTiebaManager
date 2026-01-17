@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from src.db import Database
 from src.schemas.process import ProcessObject
-from src.utils.anonymous import AnonymousAiotieba
+from src.utils.anonymous import AnnoymousTiebaMeow
 from src.utils.cache import ExpireCache
 from src.utils.logging import exception_logger
 
@@ -32,7 +32,8 @@ class TiebaInfo:
             if user_info := await cls.user_info_cache.get(_id):
                 return user_info
 
-            user_info = await (await AnonymousAiotieba.client()).get_user_info(_id)
+            user_info = await (await AnnoymousTiebaMeow.client()).get_user_info(_id)
+
             if user_info.user_id:
                 await cls.user_info_cache.set(_id, user_info)
 
@@ -57,7 +58,7 @@ class TiebaInfo:
                 if thread:
                     data.data["is_thread_author"] = thread.author_id == data.content.user.user_id
                 else:
-                    posts = await (await AnonymousAiotieba.client()).get_posts(
+                    posts = await (await AnnoymousTiebaMeow.client()).get_posts(
                         data.content.tid
                     )  # try to fetch thread info
                     if posts:
