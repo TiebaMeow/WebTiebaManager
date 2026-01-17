@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-import aiotieba
 from pydantic import BaseModel
 from sqlalchemy import select
+from tiebameow.client import Client
 
 from src.core.constants import PID_CACHE_EXPIRE
 from src.core.controller import Controller
@@ -22,6 +22,8 @@ from src.utils.tools import EtaSleep, Timer
 from .browser import TiebaBrowser
 
 if TYPE_CHECKING:
+    import aiotieba
+
     from src.core.config import SystemConfig
     from src.schemas.event import UpdateEventData
 
@@ -85,7 +87,7 @@ class CrawlNeed(BaseModel):
 
 
 class Spider:
-    client: aiotieba.Client
+    client: Client
     browser: TiebaBrowser
     eta: EtaSleep
 
@@ -104,7 +106,7 @@ class Spider:
 
     async def init_client(self):
         if self.client is None:
-            self.client = aiotieba.Client()
+            self.client = Client()
             await self.client.__aenter__()
         if self.browser is None:
             self.browser = TiebaBrowser()
@@ -127,7 +129,10 @@ class Spider:
         # 获取主题列表
         for i in range(1, scan.thread_page_forward + 1):
             async with self.eta:
-                raw_threads.extend(await self.client.get_threads(forum, pn=i))
+                try:
+                    raw_threads.extend(await self.client.get_threads(forum, pn=i))
+                except Exception as e:
+                    system_logger.error(f"Error getting threads for forum {forum} page {i}: {e}")
 
         for thread in raw_threads:
             updated = await Database.check_and_update_cache(thread)
@@ -177,8 +182,14 @@ class Spider:
 
                 target_pn = (post.reply_num + 29) // 30
                 async with self.eta:
-                    comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
-                    raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
+                    try:
+                        comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
+                    except Exception as e:
+                        system_logger.error(
+                            f"Error getting comments for post {post.pid} in thread {post.tid} page {target_pn}: {e}"
+                        )
+                    else:
+                        raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
 
                 for comment in raw_comments:
                     updated = await Database.check_and_update_cache(comment)
