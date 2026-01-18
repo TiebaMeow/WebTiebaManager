@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, NamedTuple, Literal
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import aiotieba
 import colorama
@@ -188,6 +188,14 @@ class LogRecorder:
 
 # 移除默认处理器
 logger.remove()
+
+
+def logger_patcher(record):
+    if "name" not in record["extra"]:
+        record["extra"]["name"] = record["name"]
+
+
+logger.configure(patcher=logger_patcher)
 
 # 自定义格式
 log_format_no_color = "{time:YYYY-MM-DD HH:mm:ss} [{level}] {extra[name]} | {message}"
