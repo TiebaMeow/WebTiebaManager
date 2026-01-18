@@ -33,19 +33,63 @@ LEVEL_COLOR = {
 }
 
 
+def supports_color() -> bool:
+    """
+    判断当前系统/终端环境是否支持 ANSI 颜色输出
+    """
+    # 1. 检查环境变量强制禁用
+    if os.getenv("NO_COLOR") or os.getenv("TERM") == "dumb":
+        return False
+
+    # 2. 必须是 TTY (终端)
+    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+        return False
+
+    # 3. 非 Windows 系统通常支持
+    if sys.platform != "win32":
+        return True
+
+    # 4. Windows 平台特殊检测
+    # 检查是否运行在 Windows Terminal (WT_SESSION) 或有 ANSICON 支持 (如 Cmder)
+    if "WT_SESSION" in os.environ or "ANSICON" in os.environ:
+        return True
+
+    # Windows 10 TH2 (10586) 之后原生支持 ANSI
+    # Windows Server 2012 (NT 6.2) / 2012 R2 (NT 6.3) 原生不支持，会返回 False
+    try:
+        ver = sys.getwindowsversion()
+        return ver.major >= 10
+    except AttributeError:
+        return False
+
+
 LOGURU_DIAGNOSE = os.getenv("LOGURU_DIAGNOSE", "false").lower() == "true" or DEBUG
 
 
 class ColorFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None, style="%"):
+        super().__init__(fmt, datefmt, style)
+        self.use_color = supports_color()
+
     def formatTime(self, record, datefmt=None):  # noqa: N802
         s = super().formatTime(record, datefmt)
-        return f"{Fore.GREEN}{s}{Style.RESET_ALL}"
+        return f"{Fore.GREEN}{s}{Style.RESET_ALL}" if self.use_color else s
 
     def format(self, record):
+        # 如果不支持颜色，直接调用父类方法并跳过颜色逻辑
+        if not self.use_color:
+            return super().format(record)
+
+        original_levelname = record.levelname
         log_level = record.levelname
         if log_level in LEVEL_COLOR:
             record.levelname = f"{LEVEL_COLOR[log_level]}{log_level}{Style.RESET_ALL}"
-        return super().format(record)
+
+        result = super().format(record)
+
+        # 恢复 record 的原始状态，避免影响其他处理器
+        record.levelname = original_levelname
+        return result
 
 
 def get_uvicorn_log_config(name: str) -> dict:
