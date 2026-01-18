@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.core.controller import Controller
-from src.utils.anonymous import AnnoymousTiebaMeow
+from src.utils.anonymous import AnoymousTiebaMeow
 from src.utils.logging import exception_logger
 
 from ..server import app
@@ -50,7 +50,7 @@ async def get_portrait(portrait: str, size: Literal["s", "m", "l"] = "s") -> Str
     if not Controller.running:
         raise HTTPException(status_code=503, detail="Service Unavailable")
     with exception_logger("获取头像失败"):
-        image = await (await AnnoymousTiebaMeow.client()).get_portrait(portrait, size=size)
+        image = await (await AnoymousTiebaMeow.client()).get_portrait(portrait, size=size)
     loop = asyncio.get_running_loop()
     return StreamingResponse(
         content=await loop.run_in_executor(ResourceAPIExecutorManager.get_executor(), ndarray2image, image.img),
@@ -64,7 +64,7 @@ async def get_image(hash: str, size: Literal["s", "m", "l"] = "s") -> StreamingR
     if not Controller.running:
         raise HTTPException(status_code=503, detail="Service Unavailable")
     with exception_logger("获取图片失败"):
-        image = await (await AnnoymousTiebaMeow.client()).hash2image(hash, size=size)
+        image = await (await AnoymousTiebaMeow.client()).hash2image(hash, size=size)
     loop = asyncio.get_running_loop()
     return StreamingResponse(
         content=await loop.run_in_executor(ResourceAPIExecutorManager.get_executor(), ndarray2image, image.img),
