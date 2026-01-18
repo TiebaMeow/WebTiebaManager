@@ -41,7 +41,7 @@ async def stop_anonymous_clients(_=None):
     await AnonymousAiotieba.stop()
 
 
-class AnnoymousTiebaMeow(AnonymousAiotieba):
+class AnoymousTiebaMeow(AnonymousAiotieba):
     @classmethod
     async def client(cls):
         if not cls._client:

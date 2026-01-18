@@ -301,13 +301,12 @@ class Crawler:
                     user_level_ids = list(user_levels.keys())
                     async with Database.get_session() as session:
                         if user_level_ids:
-                            async with Database.get_session() as session:
-                                result = await session.execute(
-                                    select(UserLevelModel)
-                                    .where(UserLevelModel.fname == forum)
-                                    .where(UserLevelModel.user_id.in_(user_level_ids))
-                                )
-                                existing_levels = {ulm.user_id: ulm for ulm in result.scalars().all()}
+                            result = await session.execute(
+                                select(UserLevelModel)
+                                .where(UserLevelModel.fname == forum)
+                                .where(UserLevelModel.user_id.in_(user_level_ids))
+                            )
+                            existing_levels = {ulm.user_id: ulm for ulm in result.scalars().all()}
                         else:
                             existing_levels = {}
 
