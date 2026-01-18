@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, Literal
 
 import aiotieba
 import colorama
@@ -67,7 +67,7 @@ LOGURU_DIAGNOSE = os.getenv("LOGURU_DIAGNOSE", "false").lower() == "true" or DEB
 
 
 class ColorFormatter(logging.Formatter):
-    def __init__(self, fmt=None, datefmt=None, style="%"):
+    def __init__(self, fmt=None, datefmt=None, style: Literal["%", "{", "$"] = "%"):
         super().__init__(fmt, datefmt, style)
         self.use_color = supports_color()
 
