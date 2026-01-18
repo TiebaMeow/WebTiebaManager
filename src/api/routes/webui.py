@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 import aiofiles
+import aiohttp
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -66,10 +67,14 @@ class LocalAsset:
 
 
 def _normalize_relative_path(rel_path: str) -> str | None:
-    normalized = rel_path.replace("\\", "/").lstrip("/")
-    safe_path = PurePosixPath(normalized)
-    if any(part == ".." for part in safe_path.parts):
+    raw = rel_path.replace("\\", "/")
+    raw_parts = raw.split("/")
+    if any(part == ".." for part in raw_parts):
         return None
+
+    normalized = raw.lstrip("/")
+    safe_path = PurePosixPath(normalized)
+
     return str(safe_path)
 
 
@@ -77,8 +82,14 @@ async def _read_from_local_dir(normalized_path: str) -> LocalAsset | None:
     if LOCAL_WEBUI_DIR is None:
         return None
 
-    file_path = (LOCAL_WEBUI_DIR / normalized_path).resolve()
-    if not file_path.is_relative_to(LOCAL_WEBUI_DIR) or not file_path.is_file():
+    base_dir = LOCAL_WEBUI_DIR.resolve()
+
+    try:
+        file_path = (base_dir / normalized_path).resolve(strict=True)
+    except FileNotFoundError:
+        return None
+
+    if not file_path.is_relative_to(base_dir) or not file_path.is_file():
         return None
 
     async with aiofiles.open(file_path, "rb") as f:
@@ -143,9 +154,15 @@ async def reverse_proxy(url: str, request: Request, raw=False):
             for h in ["Transfer-Encoding", "Content-Encoding", "Server", "Date", "Content-Length"]:
                 headers.pop(h, None)
             return data, resp.status, headers
-    except Exception as e:
-        system_logger.error(f"网页资源反向代理失败: {e}")
+    except TimeoutError as e:
+        system_logger.error(f"网页资源请求超时: {e}")
+        raise HTTPException(status_code=504, detail="Gateway Timeout") from e
+    except aiohttp.ClientError as e:
+        system_logger.error(f"网页资源请求失败: {e}")
         raise HTTPException(status_code=502, detail="Bad Gateway") from e
+    except Exception as e:
+        system_logger.error(f"网页资源反向代理内部错误: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
 
 async def download_resource(path: Path):

@@ -94,6 +94,13 @@ class ProcessData(BaseModel):
         """
         return self.content.pid if self.content else hash(id(self))
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProcessData):
+            return False
+        if self.content and other.content:
+            return self.content.pid == other.content.pid
+        return self is other
+
 
 async def attach_content(logs: list[ProcessLogModel]) -> list[ProcessData]:
     contents = await Database.get_full_contents_by_pids([log.pid for log in logs])

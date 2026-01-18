@@ -9,7 +9,7 @@ import zipfile
 from typing import TYPE_CHECKING
 
 from src.core.constants import CACHE_DIR, PLUGIN_DIR
-from src.utils.logging import system_logger
+from src.utils.logging import exception_logger, system_logger
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -46,7 +46,7 @@ def load_plugins() -> None:
             try:
                 shutil.rmtree(item, ignore_errors=True)
             except Exception:
-                pass
+                system_logger.warning(f"无法删除旧的插件缓存目录: {item}")
 
     # 使用唯一子目录避免删除整个目录带来的安全风险
     PLUGIN_CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,7 @@ def load_plugins() -> None:
         module_name = f"webtm_plugin_{item.stem}"
         entry_point: Path | None = None
 
-        try:
+        with exception_logger(f"加载插件 {item.name} 失败"):
             if item.is_file() and item.suffix == ".py":
                 # 情况 1: .py 文件
                 entry_point = item
@@ -107,12 +107,6 @@ def load_plugins() -> None:
                     system_logger.error(f"插件 {plugin_name} 依赖加载失败，跳过加载")
                     continue
 
-                # 将入口点的父目录添加到 sys.path
-                # 以便插件可以导入其自己的子模块
-                # plugin_dir = entry_point.parent
-                # if str(plugin_dir) not in sys.path:
-                #     sys.path.insert(0, str(plugin_dir))
-
                 spec = importlib.util.spec_from_file_location(module_name, entry_point)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
@@ -128,9 +122,6 @@ def load_plugins() -> None:
                                 system_logger.debug(f"已从 sys.path 移除库路径: {path}")
                 else:
                     system_logger.error(f"无法为插件创建 spec: {plugin_name}")
-
-        except Exception:
-            system_logger.exception(f"加载插件 {item.name} 时出错")
 
 
 def load_lib_from_zip(zip_path: Path, lib_name: str | None = None, extract_dirname: str | None = None) -> str | None:

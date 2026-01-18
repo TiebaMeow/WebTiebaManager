@@ -148,23 +148,6 @@ class ContentModel(Base):
         )
 
 
-# class LifeModel(Base):
-#     __tablename__ = "life"
-
-#     pid: Mapped[int] = mapped_column(BIGINT, primary_key=True)
-#     tid: Mapped[int] = mapped_column(BIGINT, index=True, nullable=False)
-#     create_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-#     process_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_with_tz, nullable=False)
-#     data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-#     user: Mapped[str] = mapped_column(String(255), nullable=False)
-
-#     content: Mapped[ContentModel] = relationship(
-#         "ContentModel",
-#         back_populates="life",
-#         primaryjoin=lambda: ContentModel.pid == foreign(LifeModel.pid),
-#     )
-
-
 class ProcessLogModel(Base):
     __tablename__ = "process_log"
     __table_args__ = (PrimaryKeyConstraint("pid", "user"),)
