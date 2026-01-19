@@ -1,5 +1,7 @@
 import asyncio
 
+from packaging.version import parse
+
 from src.core.constants import IS_EXE, MAIN_SERVER, PROGRAM_VERSION, PROJECT_ROOT
 
 from .anonymous import AnonymousAiohttp
@@ -42,7 +44,7 @@ async def check_for_updates() -> None:
     if latest_version is None:
         return
 
-    if latest_version != PROGRAM_VERSION:
+    if parse(latest_version) > parse(PROGRAM_VERSION):
         system_logger.info(f"检测到新版本: v{latest_version}")
         if IS_EXE:
             system_logger.info(f"请访问 {RELEASE_URL} 下载最新版本")
