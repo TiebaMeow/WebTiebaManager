@@ -207,10 +207,10 @@ class Spider:
                     else:
                         raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
 
-                for comment in raw_comments:
-                    updated = await Database.check_and_update_cache(comment)
-                    if updated & UpdateStatus.IS_NEW and need.comment:
-                        yield comment
+            for comment in raw_comments:
+                updated = await Database.check_and_update_cache(comment)
+                if updated & UpdateStatus.IS_NEW and need.comment:
+                    yield comment
 
 
 class Crawler:
