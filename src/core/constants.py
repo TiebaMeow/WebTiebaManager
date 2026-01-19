@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 
-PROGRAM_VERSION = "1.4.0"
+PROGRAM_VERSION = "1.4.1"
 IS_EXE = hasattr(sys, "frozen")
 
 DEV = "dev" in sys.argv or "--dev" in sys.argv
