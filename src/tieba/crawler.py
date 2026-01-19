@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 from sqlalchemy import select
 from tiebameow.client import Client
-from tiebameow.client.tieba_client import UnretriableApiError
+from tiebameow.client.tieba_client import AiotiebaError
 
 from src.core.constants import PID_CACHE_EXPIRE
 from src.core.controller import Controller
@@ -132,7 +132,7 @@ class Spider:
             async with self.eta:
                 try:
                     raw_threads.extend(await self.client.get_threads(forum, pn=i))
-                except UnretriableApiError as e:
+                except AiotiebaError as e:
                     if e.code == 429:
                         system_logger.warning(f"访问贴吧 {forum} 过于频繁，已被限制访问")
                     else:
@@ -190,7 +190,7 @@ class Spider:
                 async with self.eta:
                     try:
                         comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
-                    except UnretriableApiError as e:
+                    except AiotiebaError as e:
                         if e.code == 429:
                             system_logger.warning(f"访问帖子 {post.pid} 所在主题 {post.tid} 过于频繁，已被限制访问")
                         else:
