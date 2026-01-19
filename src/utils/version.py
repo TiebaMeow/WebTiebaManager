@@ -1,5 +1,7 @@
 import asyncio
+import ssl
 
+import aiohttp
 from packaging.version import parse
 
 from src.core.constants import IS_EXE, MAIN_SERVER, PROGRAM_VERSION, PROJECT_ROOT
@@ -10,11 +12,19 @@ from .logging import exception_logger, system_logger
 GITHUB_RELEASES_API = "https://api.github.com/repos/TiebaMeow/WebTiebaManager/releases/latest"
 RELEASE_URL = "https://github.com/TiebaMeow/WebTiebaManager/releases/latest"
 
+IGNORE_EXCEPTIONS = (
+    asyncio.TimeoutError,
+    aiohttp.ClientConnectionError,
+    aiohttp.ClientPayloadError,
+    ssl.SSLError,
+    ssl.CertificateError,
+)
+
 
 async def get_latest_version() -> str | None:
-    with exception_logger("获取最新版本信息失败", ignore_exceptions=(asyncio.TimeoutError,)):
+    session = await AnonymousAiohttp.session()
+    with exception_logger("获取最新版本信息失败", ignore_exceptions=IGNORE_EXCEPTIONS):
         # 优先尝试从github直接获取最新版本
-        session = await AnonymousAiohttp.session()
         async with session.get(GITHUB_RELEASES_API) as resp:
             if resp.status == 200:
                 data = await resp.json()
@@ -24,7 +34,7 @@ async def get_latest_version() -> str | None:
                 else:
                     system_logger.warning("未能在Github响应中找到版本信息")
 
-    with exception_logger("获取最新版本信息失败", ignore_exceptions=(asyncio.TimeoutError,)):
+    with exception_logger("获取最新版本信息失败", ignore_exceptions=IGNORE_EXCEPTIONS):
         # 其次尝试从备用服务器获取最新版本
         async with session.get(f"{MAIN_SERVER}/version") as resp:
             if resp.status == 200:
