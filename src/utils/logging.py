@@ -221,7 +221,7 @@ logger.add(
     filter=console_filter,
     level=LOG_LEVEL,
     diagnose=LOGURU_DIAGNOSE,
-    colorize=True,
+    colorize=supports_color(),
 )
 
 # 修改文件处理器：输出到 logos 文件夹下
