@@ -159,6 +159,9 @@ class Spider:
             async with self.eta:
                 data = await self.browser.get_posts(thread.tid, pn=1)
 
+                raw_posts.extend(data.posts)
+                raw_comments.extend(data.comments)
+
                 total_page = data.total_page
                 # 优化页码遍历逻辑
                 pages = list(range(2, min(scan.post_page_forward + 1, total_page + 1)))
