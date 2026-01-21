@@ -22,6 +22,8 @@ class ConditionTemplate(BaseModel, abc.ABC):
     _show_unprocessed: bool = False  # 私有属性，控制未处理时的显示
     _option_descs: list[OptionDesc] | None = None  # 私有属性，表示参数信息，仅在series不填写时启用
 
+    _UNPROCESSEED = "<unprocessed>"
+
     @property
     def key(self) -> str | None:
         """
@@ -40,7 +42,7 @@ class ConditionTemplate(BaseModel, abc.ABC):
                 如果消耗大（如API调用），返回 "<unprocessed>"
         """
         if self._show_unprocessed and not processed:
-            return "<unprocessed>"
+            return self._UNPROCESSEED
         return str(await self.get_value(obj))
 
     @property
