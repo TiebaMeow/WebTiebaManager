@@ -41,3 +41,8 @@ class OptionDescMaker:
 
     def build(self):
         return self._descs
+
+    def __add__(self, other: "OptionDescMaker") -> "OptionDescMaker":
+        new_descs = OptionDescMaker()
+        new_descs._descs = [i.model_copy(deep=True) for i in self._descs + other._descs]
+        return new_descs
