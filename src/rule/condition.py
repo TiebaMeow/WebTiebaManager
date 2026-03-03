@@ -158,11 +158,13 @@ class Conditions:
 
                     if defined_option_keys - option_desc_keys:
                         raise ValueError(
-                            f"自定义条件 {name} 的参数信息不完整，缺少参数 {defined_option_keys - option_desc_keys} 的信息"
+                            f"自定义条件 {name} 的参数信息不完整，"
+                            f"缺少参数 {defined_option_keys - option_desc_keys} 的信息"
                         )
                     elif option_desc_keys - defined_option_keys:
                         raise ValueError(
-                            f"自定义条件 {name} 缺少定义的参数，参数 {option_desc_keys - defined_option_keys} 未在options中定义"
+                            f"自定义条件 {name} 缺少定义的参数，"
+                            f"参数 {option_desc_keys - defined_option_keys} 未在options中定义"
                         )
 
             cls.condition_dict[condition_type] = condition  # type: ignore
