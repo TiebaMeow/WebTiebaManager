@@ -258,24 +258,23 @@ class User:
     def save_config(self):
         write_config(self.config, self.dir / User.CONFIG_FILE)
 
-    async def process(self, content: Content, options: ProcessOptions | None = None):
-        obj = ProcessObject(content)
+    async def process(self, obj: ProcessObject, options: ProcessOptions | None = None):
         result_rule = await self.processer.process(obj)
         if result_rule:
             self.logger.info(
-                f"{content.mark} 命中 {result_rule.name}",
-                tid=content.tid,
-                pid=content.pid,
-                uid=content.user.user_id,
-                portrait=content.user.portrait,
+                f"{obj.content.mark} 命中 {result_rule.name}",
+                tid=obj.content.tid,
+                pid=obj.content.pid,
+                uid=obj.content.user.user_id,
+                portrait=obj.content.user.portrait,
             )
             if options is None or options.execute_operations:
                 await self.operate_rule(obj, result_rule, options=options)
 
         return result_rule
 
-    async def handle_dispatch(self, content: Content):
-        await self.process(content)
+    async def handle_dispatch(self, obj: ProcessObject):
+        await self.process(obj.copy())
 
     async def operate(self, obj: ProcessObject, og: OperationGroup):
         operations = og.operations

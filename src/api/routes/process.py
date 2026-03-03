@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from src.db import Database
 from src.models import ProcessContextModel, ProcessLogModel
-from src.schemas.process import ConditionContext, ProcessOptions, RuleContext
+from src.schemas.process import ConditionContext, ProcessObject, ProcessOptions, RuleContext
 from src.schemas.tieba import Content, Post, User
 
 from ..auth import current_user_depends
@@ -252,7 +252,7 @@ async def reprocess_content(user: current_user_depends, request: ReprocessReques
     )
 
     result_rule = await user.process(
-        content,
+        ProcessObject(content=content, dto=None),
         options=ProcessOptions(execute_operations=request.execute_operations, need_confirm=request.need_confirm),
     )
 

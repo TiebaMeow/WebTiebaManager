@@ -24,11 +24,12 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from tiebameow.models.dto import CommentDTO, PostDTO, ThreadDTO
 
 from src.core.config import DatabaseConfig
 from src.core.controller import Controller
 from src.models import Base, ContentModel, ForumModel, ProcessContextModel, ProcessLogModel, UserLevelModel, UserModel
-from src.schemas.tieba import Comment, Content, Model2Content, Post, User
+from src.schemas.tieba import Content, Model2Content, User
 from src.utils.logging import system_logger
 
 if TYPE_CHECKING:
@@ -38,7 +39,7 @@ if TYPE_CHECKING:
     from src.core.config import SystemConfig
     from src.schemas.event import UpdateEventData
 
-MixedContentType = aiotieba.Thread | Post | Comment
+MixedContentType = aiotieba.Thread | ThreadDTO | PostDTO | CommentDTO
 
 
 class UpdateStatus(IntFlag):
@@ -342,17 +343,17 @@ class Database:
             await session.commit()
 
         updated = UpdateStatus.UNCHANGED
-        if isinstance(content, aiotieba.Thread):
+        if isinstance(content, (aiotieba.Thread, ThreadDTO)):
             if content_cache is None:
                 updated = UpdateStatus.NEW_WITH_CHILD if content.reply_num > 0 else UpdateStatus.NEW
             elif (content.last_time, content.reply_num) != content_cache:
                 updated = UpdateStatus.UPDATED
-        elif isinstance(content, Post):
+        elif isinstance(content, PostDTO):
             if content_cache is None:
                 updated = UpdateStatus.NEW_WITH_CHILD if content.reply_num > 4 else UpdateStatus.NEW
             elif (None, content.reply_num) != content_cache:
                 updated = UpdateStatus.UPDATED
-        elif isinstance(content, Comment):
+        elif isinstance(content, CommentDTO):
             if content_cache is None:
                 updated = UpdateStatus.NEW
 

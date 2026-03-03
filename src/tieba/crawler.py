@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 from sqlalchemy import select
 from tiebameow.client import Client
 from tiebameow.client.tieba_client import AiotiebaError
+from tiebameow.parser import convert_aiotieba_comments, convert_aiotieba_posts, convert_aiotieba_thread
 
 from src.core.constants import PID_CACHE_EXPIRE
 from src.core.controller import Controller
 from src.db import Database, UpdateStatus
 from src.models import ContentModel, UserLevelModel, UserModel
+from src.schemas.process import ProcessObject
 from src.schemas.tieba import Comment, Post, Thread
 from src.user.manager import UserManager
 from src.utils.cache import ClearCache
@@ -24,6 +27,7 @@ from .browser import TiebaBrowser
 
 if TYPE_CHECKING:
     import aiotieba
+    from tiebameow.models.dto import CommentDTO, PostDTO
 
     from src.core.config import SystemConfig
     from src.schemas.event import UpdateEventData
@@ -87,6 +91,19 @@ class CrawlNeed(BaseModel):
         return not (self.thread or self.post or self.comment)
 
 
+@contextmanager
+def with_error_handler(task: Literal["thread", "post", "comment"], forum: str, i: int):
+    try:
+        yield
+    except AiotiebaError as e:
+        if e.code == 429:
+            system_logger.warning(f"访问贴吧 {forum} 过于频繁，已被限制访问")
+        else:
+            system_logger.warning(f"爬取 {task} 时第 {i} 页出错: {e}")
+    except Exception as e:
+        system_logger.exception(f"爬取 {task} 时第 {i} 页出错: {e}")
+
+
 class Spider:
     client: Client
     browser: TiebaBrowser
@@ -130,53 +147,49 @@ class Spider:
         # 获取主题列表
         for i in range(1, scan.thread_page_forward + 1):
             async with self.eta:
-                try:
-                    raw_threads.extend(await self.client.get_threads(forum, pn=i))
-                except AiotiebaError as e:
-                    if e.code == 429:
-                        system_logger.warning(f"访问贴吧 {forum} 过于频繁，已被限制访问")
-                    else:
-                        system_logger.warning(f"Error getting threads for forum {forum} page {i}: {e}")
-                except Exception as e:
-                    system_logger.error(f"Error getting threads for forum {forum} page {i}: {e}")
+                with with_error_handler("thread", forum, i):
+                    data = await self.client.get_threads(forum, pn=i)
+                    raw_threads.extend(data.objs)
 
         for thread in raw_threads:
             updated = await Database.check_and_update_cache(thread)
 
             # NEW or NEW_WITH_CHILD
             if updated & UpdateStatus.IS_NEW and need.thread:
-                yield Thread.from_aiotieba_data(thread)
-
+                yield ProcessObject(content=Thread.from_aiotieba_data(thread), dto=convert_aiotieba_thread(thread))
             # UNCHANGED or NEW
             if updated & UpdateStatus.IS_STABLE or (not need.post and not need.comment):
                 continue
 
             # UPDATED or NEW_WITH_CHILD
 
-            raw_posts: list[Post] = []
-            raw_comments: list[Comment] = []
+            raw_posts: list[PostDTO] = []
+            raw_comments: list[CommentDTO] = []
 
             async with self.eta:
-                data = await self.browser.get_posts(thread.tid, pn=1)
+                with with_error_handler("post", forum, 1):
+                    data = convert_aiotieba_posts(await self.client.get_posts(thread.tid, pn=1, with_comments=True))
 
-                raw_posts.extend(data.posts)
-                raw_comments.extend(data.comments)
+            for post in data.objs:
+                raw_posts.append(post)
+                raw_comments.extend(post.comments)
 
-                total_page = data.total_page
-                # 优化页码遍历逻辑
-                pages = list(range(2, min(scan.post_page_forward + 1, total_page + 1)))
-                if total_page < scan.post_page_forward + scan.post_page_backward:
-                    pages += list(range(len(pages) + 2, total_page + 1))
-                else:
-                    pages += list(
-                        range(total_page, max(total_page - scan.post_page_backward, scan.post_page_forward), -1)
-                    )
+            total_page = data.page.total_page
+            # 优化页码遍历逻辑
+            pages = list(range(2, min(scan.post_page_forward + 1, total_page + 1)))
+            if total_page < scan.post_page_forward + scan.post_page_backward:
+                pages += list(range(len(pages) + 2, total_page + 1))
+            else:
+                pages += list(range(total_page, max(total_page - scan.post_page_backward, scan.post_page_forward), -1))
 
-                for i in pages:
-                    async with self.eta:
-                        data = await self.browser.get_posts(thread.tid, pn=i)
-                        raw_posts.extend(data.posts)
-                        raw_comments.extend(data.comments)
+            for i in pages:
+                async with self.eta:
+                    with with_error_handler("post", forum, i):
+                        data = convert_aiotieba_posts(await self.client.get_posts(thread.tid, pn=i, with_comments=True))
+
+                for post in data.objs:
+                    raw_posts.append(post)
+                    raw_comments.extend(post.comments)
 
             for post in raw_posts:
                 if post.floor == 1:
@@ -184,33 +197,23 @@ class Spider:
                 updated = await Database.check_and_update_cache(post)
 
                 if updated & UpdateStatus.IS_NEW and need.post:
-                    yield post
+                    yield ProcessObject(content=Post.from_dto(post, title=thread.title), dto=post)
 
                 if updated & UpdateStatus.IS_STABLE or not need.post:
                     continue
 
                 target_pn = (post.reply_num + 29) // 30
                 async with self.eta:
-                    try:
-                        comments = await self.client.get_comments(post.tid, post.pid, pn=target_pn)
-                    except AiotiebaError as e:
-                        if e.code == 429:
-                            system_logger.warning(f"访问帖子 {post.pid} 所在主题 {post.tid} 过于频繁，已被限制访问")
-                        else:
-                            system_logger.warning(
-                                f"Error getting comments for post {post.pid} in thread {post.tid} page {target_pn}: {e}"
-                            )
-                    except Exception as e:
-                        system_logger.error(
-                            f"Error getting comments for post {post.pid} in thread {post.tid} page {target_pn}: {e}"
+                    with with_error_handler("comment", forum, target_pn):
+                        data = convert_aiotieba_comments(
+                            await self.client.get_comments(thread.tid, post.pid, pn=target_pn)
                         )
-                    else:
-                        raw_comments.extend(Comment.from_aiotieba_data(i, title=thread.title) for i in comments)
+                        raw_comments.extend(data.objs)
 
             for comment in raw_comments:
                 updated = await Database.check_and_update_cache(comment)
                 if updated & UpdateStatus.IS_NEW and need.comment:
-                    yield comment
+                    yield ProcessObject(content=Comment.from_dto(comment, title=thread.title), dto=comment)
 
 
 class Crawler:
@@ -296,7 +299,8 @@ class Crawler:
                 for forum, need in cls.needs.items():
                     user_levels: dict[int, UserLevelModel] = {}
 
-                    async for content in cls.get_spider().crawl(forum, need):
+                    async for process_object in cls.get_spider().crawl(forum, need):
+                        content = process_object.content
                         system_logger.debug(f"爬取到新内容. {content.mark} 来自 {forum}")
 
                         if content.user.user_id not in users:
@@ -312,7 +316,7 @@ class Crawler:
                         # note 规则判断依赖已插入数据库的内容，需要再判断前插入
                         await Database.save_items([ContentModel.from_content(content)])
 
-                        await Controller.DispatchContent.broadcast(content)
+                        await Controller.DispatchContent.broadcast(process_object)
 
                     user_level_ids = list(user_levels.keys())
                     async with Database.get_session() as session:

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     import aiotieba.typing
+    from tiebameow.models.dto import CommentDTO, PostDTO, ThreadDTO
 
     from src.models import ContentModel
 
@@ -59,6 +60,16 @@ class User(BaseModel):
             level=data.user.level,
         )
 
+    @staticmethod
+    def from_dto(dto: ThreadDTO | PostDTO | CommentDTO) -> User:
+        return User(
+            user_name=dto.author.user_name,
+            nick_name=dto.author.nick_name,
+            user_id=dto.author.user_id,
+            portrait=dto.author.portrait,
+            level=dto.author.level,
+        )
+
     @property
     def log_name(self) -> str:
         """
@@ -100,6 +111,14 @@ class ContentInterface(ABC):
         """
         ...
 
+    @classmethod
+    @abstractmethod
+    def from_model(cls, model: ContentModel, user: User) -> ContentInterface:
+        """
+        Convert model to CommonStructure
+        """
+        ...
+
     @staticmethod
     @abstractmethod
     def get_images_from_aiotieba_contents(contents) -> list[Image]:
@@ -137,6 +156,19 @@ class BaseContent(BaseModel):
             "" if self.type == "thread" else f"?pid={self.pid}#{self.pid}"  # type: ignore
         )
 
+    @staticmethod
+    def get_images_from_dto(dto: ThreadDTO | PostDTO):
+        return [
+            Image(
+                hash=image.hash,
+                width=image.show_width,
+                height=image.show_height,
+                src=image.origin_src,
+            )
+            for image in dto.contents
+            if image.type == "image"
+        ]
+
 
 class Thread(BaseContent, ContentInterface):
     floor: int = 1
@@ -172,6 +204,21 @@ class Thread(BaseContent, ContentInterface):
             user=user,
             last_time=model.last_time or 0,
             reply_num=model.reply_num or 0,
+        )
+
+    @classmethod
+    def from_dto(cls, dto: ThreadDTO, pid: int = 0) -> Thread:
+        return cls(
+            fname=dto.fname,
+            title=dto.title,
+            text=dto.text,
+            images=cls.get_images_from_dto(dto),
+            create_time=int(dto.create_time.timestamp()),
+            tid=dto.tid,
+            pid=pid,
+            user=User.from_dto(dto),
+            last_time=int(dto.last_time.timestamp()),
+            reply_num=dto.reply_num,
         )
 
     @staticmethod
@@ -222,6 +269,21 @@ class Post(BaseContent, ContentInterface):
             user=user,
         )
 
+    @classmethod
+    def from_dto(cls, dto: PostDTO, title: str | None = None) -> Post:
+        return cls(
+            fname=dto.fname,
+            title=title,
+            text=dto.text,
+            images=cls.get_images_from_dto(dto),
+            create_time=int(dto.create_time.timestamp()),
+            tid=dto.tid,
+            pid=dto.pid,
+            floor=dto.floor,
+            reply_num=dto.reply_num or 0,
+            user=User.from_dto(dto),
+        )
+
     @staticmethod
     def get_images_from_aiotieba_contents(contents) -> list[Image]:
         """
@@ -268,6 +330,20 @@ class Comment(BaseContent, ContentInterface):
             pid=model.pid,
             floor=model.floor,
             user=user,
+        )
+
+    @classmethod
+    def from_dto(cls, dto: CommentDTO, title: str | None = None) -> Comment:
+        return cls(
+            fname=dto.fname,
+            title=title,
+            text=dto.text,
+            images=[],
+            create_time=int(dto.create_time.timestamp()),
+            tid=dto.tid,
+            pid=dto.pid,
+            floor=dto.floor,
+            user=User.from_dto(dto),
         )
 
     @staticmethod

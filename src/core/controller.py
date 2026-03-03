@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from src.schemas.event import UpdateEventData
-from src.schemas.tieba import Content
+from src.schemas.process import ProcessObject
 from src.utils.config import read_config, write_config
 from src.utils.event import AsyncEvent
 from src.utils.logging import system_logger
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class Controller:
     Start = AsyncEvent[None]()
     Stop = AsyncEvent[None]()
-    DispatchContent = AsyncEvent[Content]()
+    DispatchContent = AsyncEvent[ProcessObject]()
     SystemConfigChange: AsyncEvent[UpdateEventData[SystemConfig]] = AsyncEvent()
     config: SystemConfig
     initialized: bool = False
