@@ -50,12 +50,7 @@ class TextCondition(ConditionTemplate):
     _series = "text"
     options: TextOptions
 
-    async def check(self, obj: ProcessObject) -> bool:
-        value = await self.get_value(obj)
-
-        if not value:
-            return False
-
+    def text_check(self, value: str) -> bool:
         if self.options.is_regex:
             return bool(self.options._re.search(value))
         else:
@@ -63,6 +58,14 @@ class TextCondition(ConditionTemplate):
                 return self.options._text in value.lower()
             else:
                 return self.options.text in value
+
+    async def check(self, obj: ProcessObject) -> bool:
+        value = await self.get_value(obj)
+
+        if not value:
+            return False
+
+        return self.text_check(str(value))
 
 
 class LimiterOptions(BaseModel):
