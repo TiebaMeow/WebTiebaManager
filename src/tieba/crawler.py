@@ -170,9 +170,9 @@ class Spider:
                 with with_error_handler("post", forum, 1):
                     data = convert_aiotieba_posts(await self.client.get_posts(thread.tid, pn=1, with_comments=True))
 
-            for post in data.objs:
-                raw_posts.append(post)
-                raw_comments.extend(post.comments)
+                    for post in data.objs:
+                        raw_posts.append(post)
+                        raw_comments.extend(post.comments)
 
             total_page = data.page.total_page
             # 优化页码遍历逻辑
@@ -187,9 +187,9 @@ class Spider:
                     with with_error_handler("post", forum, i):
                         data = convert_aiotieba_posts(await self.client.get_posts(thread.tid, pn=i, with_comments=True))
 
-                for post in data.objs:
-                    raw_posts.append(post)
-                    raw_comments.extend(post.comments)
+                        for post in data.objs:
+                            raw_posts.append(post)
+                            raw_comments.extend(post.comments)
 
             for post in raw_posts:
                 if post.floor == 1:
