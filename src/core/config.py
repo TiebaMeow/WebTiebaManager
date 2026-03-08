@@ -76,6 +76,33 @@ class ProcessConfig(BaseModel):
     record_all_context: bool = False
 
 
+class StockpileConfig(BaseModel):
+    """
+    自动囤货任务设置
+
+    enabled: 是否启用任务
+    cron: 执行时间，格式如 "HH:MM"
+    forums: 目标贴吧列表，为空则使用账号默认贴吧
+    """
+
+    enabled: bool = False
+    cron: str = "08:00"
+    forums: list[str] = Field(default_factory=list)
+
+    @field_validator("cron")
+    @classmethod
+    def validate_cron(cls, v: str) -> str:
+        parts = v.split(":")
+        if len(parts) != 2:
+            raise ValueError("时间格式错误，应为 HH:MM")
+        hour, minute = parts
+        if not hour.isdigit() or not minute.isdigit():
+            raise ValueError("时间格式错误，应为 HH:MM")
+        if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+            raise ValueError("时间超出范围，小时 0-23，分钟 0-59")
+        return v
+
+
 class ForumConfig(BaseModel):
     block_day: int = 1
     block_reason: str = ""
@@ -254,6 +281,7 @@ class UserConfig(BaseModel):
     rules: list[RuleConfig] = Field(default_factory=list, validation_alias=AliasChoices("rules", "rule_sets"))
     forum: ForumConfig = Field(default_factory=ForumConfig)
     process: ProcessConfig = Field(default_factory=ProcessConfig)
+    stockpile: StockpileConfig = Field(default_factory=StockpileConfig)
     enable: bool = True
     permission: UserPermission = Field(default_factory=UserPermission)
 

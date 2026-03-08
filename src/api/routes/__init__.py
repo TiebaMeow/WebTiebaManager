@@ -1,9 +1,10 @@
-from . import initialize, log, process, resource, system, tieba_qrcode_login, user, webui
+from . import initialize, log, process, resource, stockpile, system, tieba_qrcode_login, user, webui
 
 __all__ = [
     "initialize",
     "log",
     "resource",
+    "stockpile",
     "system",
     "tieba_qrcode_login",
     "user",
