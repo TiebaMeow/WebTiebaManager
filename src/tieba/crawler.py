@@ -148,7 +148,7 @@ class Spider:
         for i in range(1, scan.thread_page_forward + 1):
             async with self.eta:
                 with with_error_handler("thread", forum, i):
-                    data = await self.client.get_threads(forum, pn=i, sort=6)  # type: ignore 临时解决
+                    data = await self.client.get_threads(forum, pn=i)
                     raw_threads.extend(data.objs)
 
         for thread in raw_threads:
