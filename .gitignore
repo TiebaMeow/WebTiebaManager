@@ -223,3 +223,7 @@ __marimo__/
 
 WebTMData
 plugins
+
+# Agents
+AGENTS.md
+.sisyphus
