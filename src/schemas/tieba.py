@@ -341,7 +341,7 @@ class Comment(BaseContent, ContentInterface):
             images=[],
             create_time=int(dto.create_time.timestamp()),
             tid=dto.tid,
-            pid=dto.pid,
+            pid=dto.cid,
             floor=dto.floor,
             user=User.from_dto(dto),
         )

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from enum import IntFlag
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import aiotieba.typing as aiotieba
 from pydantic import ValidationError
@@ -35,6 +35,8 @@ from src.utils.logging import system_logger
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from datetime import datetime
+
+    from sqlalchemy.engine import CursorResult
 
     from src.core.config import SystemConfig
     from src.schemas.event import UpdateEventData
@@ -330,17 +332,18 @@ class Database:
     async def check_and_update_cache(cls, content: MixedContentType) -> UpdateStatus:
         async with cls.get_session() as session:
             session.begin()
-            stmt = select(ContentModel.last_time, ContentModel.reply_num)
             if isinstance(content, (CommentDTO)):
-                stmt = stmt.where(ContentModel.pid == content.cid)
+                real_pid = content.cid
             else:
-                stmt = stmt.where(ContentModel.pid == content.pid)
-            result = await session.execute(stmt)
+                real_pid = content.pid
+            result = await session.execute(
+                select(ContentModel.last_time, ContentModel.reply_num).where(ContentModel.pid == real_pid)
+            )
             row = result.first()
             content_cache = None if row is None else (row[0], row[1])
             await session.execute(
                 update(ContentModel)
-                .where(ContentModel.pid == content.pid)
+                .where(ContentModel.pid == real_pid)
                 .values(last_time=getattr(content, "last_time", None), reply_num=getattr(content, "reply_num", None))
             )
             await session.commit()
@@ -365,6 +368,9 @@ class Database:
     @classmethod
     async def clear_contents_before(cls, before: datetime) -> int:
         async with cls.get_session() as session:
-            result = await session.execute(delete(ContentModel).where(ContentModel.last_update < before))
+            result = cast(
+                "CursorResult",
+                await session.execute(delete(ContentModel).where(ContentModel.last_update < before)),
+            )
             await session.commit()
             return result.rowcount or 0
