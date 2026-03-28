@@ -168,7 +168,9 @@ class Spider:
 
             async with self.eta:
                 with with_error_handler("post", forum, 1):
-                    data = convert_aiotieba_posts(await self.client.get_posts(thread.tid, pn=1, with_comments=True))
+                    data = convert_aiotieba_posts(
+                        await self.client.get_posts(thread.tid, pn=1, with_comments=True, comment_rn=4)
+                    )
 
                     for post in data.objs:
                         raw_posts.append(post)
@@ -185,7 +187,9 @@ class Spider:
             for i in pages:
                 async with self.eta:
                     with with_error_handler("post", forum, i):
-                        data = convert_aiotieba_posts(await self.client.get_posts(thread.tid, pn=i, with_comments=True))
+                        data = convert_aiotieba_posts(
+                            await self.client.get_posts(thread.tid, pn=i, with_comments=True, comment_rn=4)
+                        )
 
                         for post in data.objs:
                             raw_posts.append(post)
