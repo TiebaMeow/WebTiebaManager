@@ -199,7 +199,7 @@ class Spider:
                 if updated & UpdateStatus.IS_NEW and need.post:
                     yield ProcessObject(content=Post.from_dto(post, title=thread.title), dto=post)
 
-                if updated & UpdateStatus.IS_STABLE or not need.post:
+                if updated & UpdateStatus.IS_STABLE or not need.comment:
                     continue
 
                 target_pn = (post.reply_num + 29) // 30
