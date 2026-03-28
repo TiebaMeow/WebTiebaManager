@@ -330,9 +330,12 @@ class Database:
     async def check_and_update_cache(cls, content: MixedContentType) -> UpdateStatus:
         async with cls.get_session() as session:
             session.begin()
-            result = await session.execute(
-                select(ContentModel.last_time, ContentModel.reply_num).where(ContentModel.pid == content.pid)
-            )
+            stmt = select(ContentModel.last_time, ContentModel.reply_num)
+            if isinstance(content, (CommentDTO)):
+                stmt = stmt.where(ContentModel.pid == content.cid)
+            else:
+                stmt = stmt.where(ContentModel.pid == content.pid)
+            result = await session.execute(stmt)
             row = result.first()
             content_cache = None if row is None else (row[0], row[1])
             await session.execute(
