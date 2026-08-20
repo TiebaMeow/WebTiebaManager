@@ -1,4 +1,3 @@
-import asyncio
 import sys
 import types
 from datetime import datetime, timedelta
@@ -140,14 +139,15 @@ async def test_upsert_with_exclude_all_nonpk_no_update(setup_db):
     assert got.text != "should-not-change"
 
 
-def test_mixed_model_raise_type_error():
+@pytest.mark.asyncio
+async def test_mixed_model_raise_type_error():
     from src.models import ForumModel
 
     f = ForumModel(fname="f", fid=1)
     c = make_content(999)
     with pytest.raises(TypeError):
         # 混合模型类型应报错
-        asyncio.get_event_loop().run_until_complete(Database.save_items([f, c]))  # type: ignore
+        await Database.save_items([f, c])
 
 
 @pytest.mark.asyncio
