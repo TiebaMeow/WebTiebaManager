@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -38,6 +40,10 @@ class UserInfodata(BaseModel):
 
 
 CodeCache = ExpireCache[UserInfodata](expire_time=INVITE_CODE_EXPIRE, directory=BASE_DIR / "code")
+
+# P2-7: 邀请码「双端检查 + 写入」与注册「读取邀请码 + 创建用户 + 删除邀请码」的
+# 原子化锁，消除并发创建重码 / 并发注册复用同一邀请码的 TOCTOU 竞争
+invite_code_lock = asyncio.Lock()
 
 
 @app.get("/api/system/get_users_info", tags=["system"])
@@ -110,12 +116,14 @@ async def create_invite_code(system_access: ensure_system_access_depends, req: U
     if req.username:
         return BaseResponse(code=400, data="", message="创建邀请码时用户名必须为空")
 
-    while any(u.config.user.code == req.code for u in UserManager.users.values()):
-        return BaseResponse(code=400, data="", message="邀请码已存在，请更换后重试")
-    if await CodeCache.get(req.code):
-        return BaseResponse(code=400, data="", message="邀请码已存在，请更换后重试")
+    # P2-7: 双端检查与写入在同一锁内完成，消除并发创建相同邀请码的 TOCTOU 竞争
+    async with invite_code_lock:
+        if any(u.config.user.code == req.code for u in UserManager.users.values()):
+            return BaseResponse(code=400, data="", message="邀请码已存在，请更换后重试")
+        if await CodeCache.get(req.code):
+            return BaseResponse(code=400, data="", message="邀请码已存在，请更换后重试")
 
-    await CodeCache.set(req.code, req)
+        await CodeCache.set(req.code, req)
 
     system_logger.info(f"创建邀请码 {req.code}")
     return BaseResponse(data=req.code, message="操作成功，邀请码七天内有效，请尽快使用")
@@ -140,30 +148,34 @@ async def register_user(req: RegisterRequest, ip: ip_depends) -> BaseResponse[bo
     if auth_rate_limiter.is_locked(ip_key):
         raise HTTPException(status_code=429, detail="注册尝试次数过多，请稍后再试")
 
-    if UserManager.get_user(req.username):
-        auth_rate_limiter.record_failure(ip_key)
-        return BaseResponse(code=400, data=False, message="用户名已存在")
+    # P2-7: 「读取邀请码、创建用户、删除邀请码」在同一锁内完成，
+    # 否则两个并发注册请求可能复用同一邀请码
+    async with invite_code_lock:
+        if UserManager.get_user(req.username):
+            auth_rate_limiter.record_failure(ip_key)
+            return BaseResponse(code=400, data=False, message="用户名已存在")
 
-    if not (data := await CodeCache.get(req.code)):
-        auth_rate_limiter.record_failure(ip_key)
-        return BaseResponse(code=400, data=False, message="邀请码无效")
+        if not (data := await CodeCache.get(req.code)):
+            auth_rate_limiter.record_failure(ip_key)
+            return BaseResponse(code=400, data=False, message="邀请码无效")
 
-    config = UserConfig(
-        user=UserInfo(
-            username=req.username,
-            password=req.password,
-            code=req.code,
-        ),
-        permission=data.permission,
-        forum=ForumConfig(fname=data.forum),
-    )
-    try:
-        await UserManager.new_user(config)
-    except Exception as e:
-        auth_rate_limiter.record_failure(ip_key)
-        return BaseResponse(data=False, message=str(e))
+        config = UserConfig(
+            user=UserInfo(
+                username=req.username,
+                password=req.password,
+                code=req.code,
+            ),
+            permission=data.permission,
+            forum=ForumConfig(fname=data.forum),
+        )
+        try:
+            await UserManager.new_user(config)
+        except Exception as e:
+            auth_rate_limiter.record_failure(ip_key)
+            return BaseResponse(data=False, message=str(e))
 
-    await CodeCache.delete(req.code)
+        # 成功消费：删除邀请码，避免再次被使用
+        await CodeCache.delete(req.code)
 
     auth_rate_limiter.clear(ip_key)
     system_logger.info(f"用户 {req.username} 注册成功 IP: {ip}")
