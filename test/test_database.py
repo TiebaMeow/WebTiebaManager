@@ -535,6 +535,57 @@ async def test_overview_sql_aggregation(setup_db):
     assert set(data.hint_rules) == {"ruleA", "ruleB", "oldRule"}
 
 
+@pytest.mark.asyncio
+async def test_shanghai_tz_semantics(setup_db):
+    # P2-8: SQLite 读回的 datetime 带上海时区语义，Unix 时间戳不再按服务器本地时区解释
+    from datetime import datetime
+
+    from src.models.models import SHANGHAI_TZ, now_with_tz
+
+    t0 = now_with_tz()
+    item = make_content(8001)
+    item.create_time = t0
+    item.last_update = t0
+    await Database.save_items([item], on_conflict="ignore")
+
+    got = (await Database.get_contents_by_pids([8001]))[0]
+    # 读回必须带上海时区语义（+08:00）
+    assert got.create_time.tzinfo is not None
+    assert got.create_time.utcoffset() == timedelta(hours=8)
+    assert got.last_update.utcoffset() == timedelta(hours=8)
+    # 同一时刻：时间戳一致（序列化不再按服务器本地时区解释）
+    assert got.create_time.timestamp() == pytest.approx(t0.timestamp())
+    assert got.last_update.timestamp() == pytest.approx(t0.timestamp())
+
+    # naive datetime 写入按上海时区解释（墙钟时刻不变）
+    naive = datetime(2026, 1, 2, 3, 4, 5)
+    item2 = make_content(8002)
+    item2.create_time = naive
+    await Database.save_items([item2], on_conflict="ignore")
+    got2 = (await Database.get_contents_by_pids([8002]))[0]
+    assert got2.create_time.tzinfo is not None
+    assert got2.create_time.replace(tzinfo=None) == naive
+    assert got2.create_time.utcoffset() == timedelta(hours=8)
+
+    # ProcessLogModel.process_time 同样带上海时区语义
+    from src.models import ProcessLogModel
+
+    log = ProcessLogModel(tid=9, pid=9001, user="tzuser", create_time=t0, process_time=t0)
+    async with Database.get_session() as session:
+        session.add(log)
+        await session.commit()
+
+    async with Database.get_session() as session:
+        from sqlalchemy import select
+
+        result = await session.execute(select(ProcessLogModel).where(ProcessLogModel.pid == 9001))
+        got_log = result.scalars().first()
+    assert got_log is not None
+    assert got_log.create_time.utcoffset() == timedelta(hours=8)
+    assert got_log.process_time.utcoffset() == timedelta(hours=8)
+    assert got_log.process_time.timestamp() == pytest.approx(t0.timestamp())
+
+
 class _RecordingEngineProxy:
     """包装真实引擎，记录 dispose 调用（用于断言连接池被释放）。"""
 

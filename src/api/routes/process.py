@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Literal
 
 from fastapi import HTTPException
@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from src.db import Database
 from src.models import ProcessContextModel, ProcessLogModel
+from src.models.models import now_with_tz
 from src.schemas.process import ConditionContext, ProcessObject, ProcessOptions, RuleContext
 from src.schemas.tieba import Content, Post, User
 
@@ -44,8 +45,8 @@ class ProcessCountData(BaseModel):
 
 @app.get("/api/process/overview", tags=["process"])
 async def get_overview(user: current_user_depends) -> BaseResponse[ProcessCountData]:
-    now = datetime.now()
-    since = now - timedelta(hours=24)
+    # P2-8: 24h 阈值与入库时间同源（上海时区），避免跨库/服务器时区差异
+    since = now_with_tz() - timedelta(hours=24)
     async with Database.get_session() as session:
         # P2-5: 概览统计改为 SQL 聚合，避免将 24h 内全部日志拉回内存再计数
         result = await session.execute(

@@ -27,6 +27,36 @@ def now_with_tz():
     return datetime.now(SHANGHAI_TZ)
 
 
+class ShanghaiDateTime(TypeDecorator):
+    """「统一存上海时间」的 datetime 类型适配器（P2-8）。
+
+    约定：入库与比较统一使用上海时区（SHANGHAI_TZ），读取侧按上海时区解释。
+
+    - bind: naive datetime 按上海时区解释后入库；aware datetime 转换为上海时区。
+    - result: SQLite 不保留时区（读回 naive），重新附加 SHANGHAI_TZ；
+      PostgreSQL 读回 aware（UTC），转换为上海时区。
+    由此 `.timestamp()` 不再按服务器本地时区解释，跨库行为一致。
+    注：仅统一新写入与比较逻辑，不迁移既有历史数据语义。
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=SHANGHAI_TZ)
+        return value.astimezone(SHANGHAI_TZ)
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=SHANGHAI_TZ)
+        return value.astimezone(SHANGHAI_TZ)
+
+
 class ModelListType[T: BaseModel](TypeDecorator):
     impl = JSON
     cache_ok = True
@@ -104,7 +134,7 @@ class ContentModel(Base):
     pid: Mapped[int] = mapped_column(BIGINT, primary_key=True)
     tid: Mapped[int] = mapped_column(BIGINT, index=True, nullable=False)
     fname: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(ShanghaiDateTime, index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=True)
     floor: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -114,7 +144,7 @@ class ContentModel(Base):
     last_time: Mapped[int | None] = mapped_column(BIGINT, nullable=True, default=None)
     reply_num: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     last_update: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), index=True, default=now_with_tz, onupdate=now_with_tz, nullable=False
+        ShanghaiDateTime, index=True, default=now_with_tz, onupdate=now_with_tz, nullable=False
     )
 
     author_id: Mapped[int] = mapped_column(BIGINT, index=True)
@@ -156,8 +186,8 @@ class ProcessLogModel(Base):
     pid: Mapped[int] = mapped_column(BIGINT, index=True, nullable=False)
     user: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
 
-    create_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    process_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_with_tz, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(ShanghaiDateTime, index=True, nullable=False)
+    process_time: Mapped[datetime] = mapped_column(ShanghaiDateTime, default=now_with_tz, nullable=False)
     result_rule: Mapped[str] = mapped_column(String(255), nullable=True)
     is_whitelist: Mapped[bool | None] = mapped_column(nullable=True)  # null时表示无匹配规则
 

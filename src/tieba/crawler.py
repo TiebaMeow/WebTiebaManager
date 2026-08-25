@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING, Literal
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -16,6 +15,7 @@ from src.core.constants import PID_CACHE_EXPIRE
 from src.core.controller import Controller
 from src.db import Database, UpdateStatus
 from src.models import ContentModel, UserLevelModel, UserModel
+from src.models.models import now_with_tz
 from src.schemas.process import ProcessObject
 from src.schemas.tieba import Comment, Post, Thread
 from src.user.manager import UserManager
@@ -36,7 +36,8 @@ if TYPE_CHECKING:
 @ClearCache.on
 async def clear_content_cache(_=None):
     with Timer() as t:
-        clear_before = datetime.now(ZoneInfo("Asia/Shanghai")) - timedelta(seconds=PID_CACHE_EXPIRE)
+        # P2-8: 清理边界与 last_update 写入同源（上海时区），避免按服务器本地时区解释
+        clear_before = now_with_tz() - timedelta(seconds=PID_CACHE_EXPIRE)
         clear_num = await Database.clear_contents_before(clear_before)
         if clear_num:
             system_logger.info(f"成功清理 {clear_num} 条过期内容缓存. 耗时: {t.cost:.2f}s")
