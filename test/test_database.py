@@ -471,6 +471,70 @@ async def test_flush_content_buffer_broadcast_order_and_failure(setup_db, monkey
     assert seen2 == []
 
 
+@pytest.mark.asyncio
+async def test_overview_sql_aggregation(setup_db):
+    # P2-5: 概览统计聚合结果与旧逻辑一致（total/hit/whitelist/hint + 用户隔离 + 24h 边界）
+    from datetime import datetime, timedelta
+
+    from src.api.routes.process import get_overview
+    from src.models import ProcessLogModel
+
+    now = datetime.now()
+    rows = [
+        ProcessLogModel(
+            tid=1, pid=1001, user="alice", create_time=now, process_time=now - timedelta(hours=1),
+            result_rule="ruleA", is_whitelist=True,
+        ),
+        ProcessLogModel(
+            tid=1, pid=1002, user="alice", create_time=now, process_time=now - timedelta(hours=2),
+            result_rule="ruleA", is_whitelist=True,
+        ),
+        ProcessLogModel(
+            tid=2, pid=2001, user="alice", create_time=now, process_time=now - timedelta(hours=3),
+            result_rule="ruleB", is_whitelist=False,
+        ),
+        ProcessLogModel(
+            tid=2, pid=2002, user="alice", create_time=now, process_time=now - timedelta(hours=4),
+            result_rule="ruleB", is_whitelist=False,
+        ),
+        ProcessLogModel(
+            tid=2, pid=2003, user="alice", create_time=now, process_time=now - timedelta(hours=5),
+            result_rule="ruleB", is_whitelist=False,
+        ),
+        ProcessLogModel(
+            tid=1, pid=1003, user="alice", create_time=now, process_time=now - timedelta(hours=7),
+            result_rule="ruleA", is_whitelist=False,
+        ),
+        # 超过 24h：不计入 total，但仍出现在 hint_rules
+        ProcessLogModel(
+            tid=4, pid=4001, user="alice", create_time=now, process_time=now - timedelta(hours=30),
+            result_rule="oldRule", is_whitelist=False,
+        ),
+        # 其他用户：不应计入
+        ProcessLogModel(
+            tid=5, pid=5001, user="bob", create_time=now, process_time=now - timedelta(hours=1),
+            result_rule="ruleBob", is_whitelist=False,
+        ),
+    ]
+    await Database.save_items(rows, on_conflict="ignore")
+
+    # 未匹配规则的日志（result_rule/is_whitelist 均为 None）：save_items 会跳过 None 值，用 session 插入
+    no_match = ProcessLogModel(
+        tid=3, pid=3001, user="alice", create_time=now, process_time=now - timedelta(hours=6),
+        result_rule=None, is_whitelist=None,
+    )
+    async with Database.get_session() as session:
+        session.add(no_match)
+        await session.commit()
+
+    resp = await get_overview(types.SimpleNamespace(username="alice"))
+    data = resp.data
+    assert data.total == {"all": 7, "hit": 4, "whitelist": 2}
+    assert data.hit_rules == {"ruleB": 3, "ruleA": 1}
+    assert data.whitelist_rules == {"ruleA": 2}
+    assert set(data.hint_rules) == {"ruleA", "ruleB", "oldRule"}
+
+
 class _RecordingEngineProxy:
     """包装真实引擎，记录 dispose 调用（用于断言连接池被释放）。"""
 

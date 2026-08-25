@@ -47,14 +47,16 @@ async def get_overview(user: current_user_depends) -> BaseResponse[ProcessCountD
     now = datetime.now()
     since = now - timedelta(hours=24)
     async with Database.get_session() as session:
-        # 查询过去24小时内所有处理日志
+        # P2-5: 概览统计改为 SQL 聚合，避免将 24h 内全部日志拉回内存再计数
         result = await session.execute(
-            select(ProcessLogModel.result_rule, ProcessLogModel.is_whitelist)
+            select(ProcessLogModel.result_rule, ProcessLogModel.is_whitelist, func.count())
             .where(ProcessLogModel.process_time >= since)
             .where(ProcessLogModel.user == user.username)
+            .group_by(ProcessLogModel.result_rule, ProcessLogModel.is_whitelist)
         )
         rows = result.all()
 
+        # hint_rules 保留原有 distinct 查询
         result = await session.execute(
             select(ProcessLogModel.result_rule)
             .where(ProcessLogModel.user == user.username, ProcessLogModel.result_rule.isnot(None))
@@ -62,15 +64,9 @@ async def get_overview(user: current_user_depends) -> BaseResponse[ProcessCountD
         )
         hint_rules = [row[0] for row in result.all()]
 
-    total_count = len(rows)
-    hit_rule_count: dict[str, int] = {}
-    whitelist_count: dict[str, int] = {}
-
-    for rule, is_whitelist in rows:
-        if is_whitelist is True:
-            whitelist_count[rule] = whitelist_count.get(rule, 0) + 1
-        elif is_whitelist is False:
-            hit_rule_count[rule] = hit_rule_count.get(rule, 0) + 1
+    total_count = sum(row[2] for row in rows)
+    hit_rule_count = {rule: count for rule, is_whitelist, count in rows if is_whitelist is False}
+    whitelist_count = {rule: count for rule, is_whitelist, count in rows if is_whitelist is True}
 
     return BaseResponse(
         data=ProcessCountData(
