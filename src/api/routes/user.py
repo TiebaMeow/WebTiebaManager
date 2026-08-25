@@ -153,21 +153,24 @@ class ConfirmRequest(BaseModel):
 
 
 async def confirm_many(user: User, pids: list[int], action: Literal["ignore", "execute"]):
-    confirms = [confirm for pid in pids if (confirm := await user.confirm.get(pid))]
-    for confirm in confirms:
-        await user.operate_confirm(confirm, action)
+    # 批量确认后台任务：内部按单个确认项 try/except（见 User.operate_confirms），
+    # 此处再兜底一层，杜绝未处理异常（P2-2）
+    try:
+        await user.operate_confirms(pids, action)
+    except Exception:
+        user.logger.exception("批量确认任务异常终止")
 
 
 @app.post("/api/confirm/confirm", tags=["confirm"])
 async def confirm_operation(user: current_user_depends, request: ConfirmRequest) -> BaseResponse[bool]:
     if isinstance(request.pid, int):
-        if not (confirm := await user.confirm.get(request.pid)):
+        outcome = (await user.operate_confirms([request.pid], request.action))[request.pid]
+        if outcome is False:
             return BaseResponse(data=False, message="内容不存在", code=400)
-        try:
-            await user.operate_confirm(confirm, request.action)
-        except ValueError:
+        if isinstance(outcome, ValueError):
             return BaseResponse(data=False, message="账号未登录，无法执行需要吧务权限的操作", code=400)
-
+        if isinstance(outcome, Exception):
+            raise outcome
         return BaseResponse(data=True, message="操作成功")
     else:
         asyncio.create_task(confirm_many(user, request.pid, request.action))

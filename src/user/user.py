@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
 from enum import Enum
 from typing import TYPE_CHECKING, Literal
@@ -19,6 +20,8 @@ from src.utils.logging import LogRecorder, logger
 from src.utils.tools import int_time
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from loguru import Logger
 
     from src.core.config import UserConfig
@@ -173,6 +176,8 @@ class User:
         self.logger = logger.bind(name=f"user.{self.config.user.username}")
         self.client: TiebaClient = TiebaClient(self.logger)
         self.valid = False
+        # P2-2: 每用户确认操作锁，保证单个/批量确认串行执行，避免重复点击并发
+        self._confirm_lock = asyncio.Lock()
 
     @property
     def enable(self):
@@ -381,3 +386,44 @@ class User:
         else:
             self.logger.warning(f"未知的确认类型. {type(confirm)}")
             raise ValueError("Invalid confirm type")
+
+    async def operate_confirms(
+        self, pids: Iterable[int], action: Literal["ignore", "execute"]
+    ) -> dict[int, bool | Exception]:
+        """
+        逐个执行确认操作（P2-2）。
+
+        在每用户锁内重新读取确认项并对 pid 去重，避免请求到达前后确认状态变化以及
+        重复 pid 导致重复执行；单个确认项失败（如账号未登录）会记录日志并保留确认项
+        以便重试，不中断后续项目。
+
+        Args:
+            pids: 待处理的确认 pid 列表。
+            action: "ignore" 或 "execute"。
+
+        Returns:
+            {pid: 执行结果}，其中 True 表示执行成功，False 表示确认项不存在，
+            异常对象表示执行失败。
+        """
+        async with self._confirm_lock:
+            unique_pids = list(dict.fromkeys(pids))
+
+            results: dict[int, bool | Exception] = {}
+            for pid in unique_pids:
+                confirm = await self.confirm.get(pid)
+                if confirm is None:
+                    results[pid] = False
+                    continue
+
+                try:
+                    await self.operate_confirm(confirm, action)
+                    results[pid] = True
+                except Exception as e:
+                    self.logger.exception(
+                        f"执行 {confirm.content.mark} 的确认失败，已保留该确认项以便重试",
+                        tid=confirm.content.tid,
+                        pid=confirm.content.pid,
+                    )
+                    results[pid] = e
+
+            return results
