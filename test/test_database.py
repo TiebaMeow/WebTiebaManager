@@ -586,6 +586,65 @@ async def test_shanghai_tz_semantics(setup_db):
     assert got_log.process_time.timestamp() == pytest.approx(t0.timestamp())
 
 
+@pytest.mark.asyncio
+async def test_reprocess_returns_real_content(setup_db):
+    # P2-9: reprocess 有 context 时响应携带真实内容；内容不可用时 404
+    import types
+
+    from fastapi import HTTPException
+    from loguru import logger
+
+    from src.api.routes.process import ReprocessRequest, reprocess_content
+    from src.models import ProcessContextModel, ProcessLogModel, UserLevelModel, UserModel
+
+    now = datetime.now(SH_TZ)
+    # 内容行 + 作者行（get_full_content_by_pid 需要 UserModel/UserLevelModel 非空）
+    item = make_content(9501)
+    item.title = "真实标题"
+    item.text = "真实正文"
+    await Database.save_items([item], on_conflict="ignore")
+    await Database.save_items(
+        [UserModel(user_id=123456, portrait="p", user_name="u", nick_name="n")], on_conflict="ignore"
+    )
+    await Database.save_items(
+        [UserLevelModel(user_id=123456, fname="test_forum", level=1)], on_conflict="ignore"
+    )
+
+    log = ProcessLogModel(
+        tid=item.tid, pid=9501, user="alice", create_time=now, process_time=now,
+        result_rule="ruleA", is_whitelist=False,
+    )
+    ctx = ProcessContextModel(pid=9501, user="alice", rules=[], conditions=[])
+    async with Database.get_session() as session:
+        session.add_all([log, ctx])
+        await session.commit()
+
+    async def fake_process(obj, options=None):
+        return None  # noqa: ARG005
+
+    stub_user = types.SimpleNamespace(
+        username="alice",
+        logger=logger.bind(test="reprocess"),
+        process=fake_process,
+    )
+
+    resp = await reprocess_content(user=stub_user, request=ReprocessRequest(pid=9501))
+    assert resp.code == 200
+    context = resp.data.context
+    assert context is not None
+    assert context.result_rule == "ruleA"
+    # 真实内容（不得被 unknown 覆盖标题/正文）
+    assert context.content is not None
+    assert context.content.pid == 9501
+    assert context.content.title == "真实标题"
+    assert context.content.text == "真实正文"
+
+    # 内容不可用的独立场景：404（不进入 context 分支）
+    with pytest.raises(HTTPException) as exc_info:
+        await reprocess_content(user=stub_user, request=ReprocessRequest(pid=99999))
+    assert exc_info.value.status_code == 404
+
+
 class _RecordingEngineProxy:
     """包装真实引擎，记录 dispose 调用（用于断言连接池被释放）。"""
 

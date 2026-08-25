@@ -269,7 +269,9 @@ async def reprocess_content(user: current_user_depends, request: ReprocessReques
                 result_rule=context[0].result_rule,
                 is_whitelist=context[0].is_whitelist or False,
                 process_time=int(context[0].process_time.timestamp()),
-                content=None,
+                # P2-9: 优先返回本函数已成功读取的真实内容，不得用 unknown 覆盖
+                # 可用的标题、正文、图片和作者信息；仅在内容确实缺失时做防御性兜底
+                content=content or make_unknown_content(request.pid, context[0].tid),
                 rules=context[1].rules,
                 conditions=context[1].conditions,
             )
