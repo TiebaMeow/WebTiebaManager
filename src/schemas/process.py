@@ -41,7 +41,8 @@ class ProcessObject[T]:
         self.dto = dto
 
     def copy(self):
-        return ProcessObject(content=self.content, dto=self.dto)
+        # P2-6: 携带 data 浅拷贝，避免分流处理时重复查询已缓存的中间结果
+        return ProcessObject(content=self.content, data=self.data.copy(), dto=self.dto)
 
 
 class ProcessOptions(BaseModel):
