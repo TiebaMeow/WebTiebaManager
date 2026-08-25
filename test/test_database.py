@@ -337,3 +337,48 @@ async def test_clear_contents_before(setup_db):
     left = {x.pid for x in got}
     assert 5001 not in left
     assert {5002, 5003}.issubset(left)
+
+
+class _RecordingEngineProxy:
+    """包装真实引擎，记录 dispose 调用（用于断言连接池被释放）。"""
+
+    def __init__(self, real):
+        object.__setattr__(self, "_real", real)
+        object.__setattr__(self, "dispose_called", False)
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_real"), name)
+
+    async def dispose(self):
+        object.__setattr__(self, "dispose_called", True)
+        await object.__getattribute__(self, "_real").dispose()
+
+
+@pytest.mark.asyncio
+async def test_test_connection_disposes_engine(monkeypatch, tmp_path):
+    # P2-1: test_connection 结束后必须释放测试连接池
+    created: list[_RecordingEngineProxy] = []
+    real_create = dbi.create_async_engine
+
+    def recording_create(*args, **kwargs):
+        proxy = _RecordingEngineProxy(real_create(*args, **kwargs))
+        created.append(proxy)
+        return proxy
+
+    monkeypatch.setattr(dbi, "create_async_engine", recording_create)
+
+    # 成功路径：返回后引擎已 dispose
+    ok_cfg = DatabaseConfig(type="sqlite", path=str(tmp_path / "conn_ok.db"))
+    success, err = await Database.test_connection(ok_cfg)
+    assert success is True
+    assert err is None
+    assert len(created) == 1
+    assert created[0].dispose_called
+
+    # 失败路径（目标为一个目录，无法打开数据库）：异常返回后同样已 dispose
+    bad_cfg = DatabaseConfig(type="sqlite", path=str(tmp_path))
+    success2, err2 = await Database.test_connection(bad_cfg)
+    assert success2 is False
+    assert err2 is not None
+    assert len(created) == 2
+    assert created[1].dispose_called

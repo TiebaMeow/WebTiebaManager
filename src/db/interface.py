@@ -137,12 +137,15 @@ class Database:
                 await conn.execute(select(1))
 
         try:
-            await asyncio.wait_for(_test(), timeout=30)
-            return True, None
-        except TimeoutError:
-            return False, TimeoutError("数据库连接测试超时（30秒）")
-        except Exception as e:
-            return False, e
+            try:
+                await asyncio.wait_for(_test(), timeout=30)
+                return True, None
+            except TimeoutError:
+                return False, TimeoutError("数据库连接测试超时（30秒）")
+            except Exception as e:
+                return False, e
+        finally:
+            await test_engine.dispose()
 
     @classmethod
     async def save_items[
