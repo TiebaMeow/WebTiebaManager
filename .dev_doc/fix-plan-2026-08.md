@@ -61,7 +61,7 @@
 | 7 | P2-1 `test_connection` 连接池泄漏（try/finally dispose） | ☑ 已完成 | `23c455a` |
 | 8 | P2-2 `confirm_many` 后台任务异常无人处理 + 并发（try/except + 每用户 Lock） | ☑ 已完成 | `7610d8b` |
 | 9 | P2-3 `CacheCleaner` 重启边界 + `cleanup_time` 无校验 | ☑ 已完成 | `ddf9e53` |
-| 10 | P2-4 爬虫逐内容小事务（per-forum 缓冲批量写入 + 缓存批量更新） | ☐ 未开始 | - |
+| 10 | P2-4 爬虫逐内容小事务（per-forum 缓冲批量写入 + 缓存批量更新） | ☑ 已完成 | `60324db` |
 | 11 | P2-5 概览统计改 SQL 聚合 | ☐ 未开始 | - |
 | 12 | P2-6 `ProcessObject.copy()` 携带 `data` | ☐ 未开始 | - |
 | 13 | P2-7 邀请码创建死循环/竞争（while→if + 检查后写入） | ☐ 未开始 | - |
