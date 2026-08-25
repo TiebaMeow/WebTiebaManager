@@ -66,7 +66,7 @@
 | 12 | P2-6 `ProcessObject.copy()` 携带 `data` | ☑ 已完成 | `fca1fc8` |
 | 13 | P2-7 邀请码创建死循环/竞争（while→if + 检查后写入） | ☑ 已完成 | `48be8db` |
 | 14 | P2-8 时区语义统一为上海时间 | ☑ 已完成 | `b8b1b70` |
-| 15 | P2-9 `reprocess` 响应 `content=None`（优先真实内容，缺失时 unknown 兜底） | ☐ 未开始 | - |
+| 15 | P2-9 `reprocess` 响应 `content=None`（优先真实内容，缺失时 unknown 兜底） | ☑ 已完成 | `1edec1b` |
 
 ---
 
