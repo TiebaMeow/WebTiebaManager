@@ -241,22 +241,47 @@ async def index(request: Request):
 async def assets(path: str, request: Request):
     cache_headers = {"Cache-Control": "max-age=2592000"}
 
+    # 路径穿越防护：先归一化，任何 .. / \\ / 开头的异常路径直接 400
+    normalized = _normalize_relative_path(path)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Bad Request")
+
     if LOCAL_OVERRIDE_ENABLED:
-        local_asset = await load_local_asset(f"assets/{path}")
+        local_asset = await load_local_asset(f"assets/{normalized}")
         if local_asset:
             media_type = local_asset.media_type or "application/octet-stream"
             return Response(content=local_asset.data, media_type=media_type, headers=cache_headers)
 
     # assets下的文件不会更新，所以优先使用本地缓存
-    cache_path = WEBUI_CACHE / path
-    if cache_path.exists():
-        return FileResponse(cache_path, headers=cache_headers)
+    base_dir = WEBUI_CACHE.resolve()
 
-    content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/assets/{path}", request)
+    # 读路径：目标存在时，使用 strict=True 解析并校验仍在缓存目录内
+    cache_path = (base_dir / normalized)
+    resolved_cache_path = cache_path.resolve(strict=True) if cache_path.exists() else cache_path.resolve()
+    if not resolved_cache_path.is_relative_to(base_dir):
+        raise HTTPException(status_code=400, detail="Bad Request")
+
+    if resolved_cache_path.is_file():
+        return FileResponse(resolved_cache_path, headers=cache_headers)
+
+    content, status_code, headers = await reverse_proxy(f"{WEBUI_BASE}/assets/{normalized}", request)
     headers.update(cache_headers)
     if status_code == 200:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(cache_path, "wb") as f:
+        # 写路径：目标首次缓存时不存在，不能预先 strict=True；
+        # 先解析并校验目标及父目录位于缓存目录内，创建父目录后重新解析父目录和目标再写入
+        parent = cache_path.parent.resolve()
+        if not parent.is_relative_to(base_dir):
+            raise HTTPException(status_code=400, detail="Bad Request")
+
+        parent.mkdir(parents=True, exist_ok=True)
+
+        # 创建父目录后重新解析，防止父目录本身是符号链接指向外部
+        final_parent = parent.resolve()
+        final_cache_path = (final_parent / cache_path.name).resolve()
+        if not final_parent.is_relative_to(base_dir) or not final_cache_path.is_relative_to(base_dir):
+            raise HTTPException(status_code=400, detail="Bad Request")
+
+        async with aiofiles.open(final_cache_path, "wb") as f:
             await f.write(content)
 
     return Response(content=content, status_code=status_code, headers=headers)
