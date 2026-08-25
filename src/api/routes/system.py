@@ -16,11 +16,11 @@ from src.schemas.user import UserInfo, UserPermission
 from src.user.manager import UserManager
 from src.utils.cache import ClearCache, ExpireCache
 from src.utils.logging import system_logger
+from src.utils.rate_limit import auth_rate_limiter
 from src.utils.tools import random_str, validate_password
 
 from ..auth import ensure_system_access_depends, ip_depends  # noqa: TC001
 from ..server import BaseResponse, Server, app
-from src.utils.rate_limit import auth_rate_limiter
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")

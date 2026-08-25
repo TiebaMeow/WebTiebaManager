@@ -41,11 +41,11 @@ sys.modules["src.control"] = module
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-import src.api.routes.system as system_mod  # noqa: E402
-import src.api.routes.initialize as init_mod  # noqa: E402
 import src.api.auth as auth_mod  # noqa: E402
+import src.api.routes.initialize as init_mod  # noqa: E402
+import src.api.routes.system as system_mod  # noqa: E402
+from src.api.server import Server, app  # noqa: E402
 from src.core.controller import Controller  # noqa: E402
-from src.api.server import app, Server  # noqa: E402
 from src.utils.rate_limit import SlidingWindowRateLimiter, auth_rate_limiter  # noqa: E402
 
 
@@ -113,7 +113,7 @@ def test_rate_limiter_clear():
 # ---------- 登录限流 ----------
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_client(monkeypatch):
     """让认证始终失败，便于观察限流行为。"""
     async def always_fail(*_a, **_k):
@@ -127,11 +127,11 @@ def fake_client(monkeypatch):
 def test_login_rate_limit_returns_429_after_limit(fake_client):
     auth_rate_limiter.limit = 3
     auth_rate_limiter.lockout = 60
-    for i in range(3):
+    for _ in range(3):
         r = fake_client.post("/api/login", data={"username": "u", "password": "wrong"})
         assert r.status_code in (401, 429)
     # 第 4 次起应该 429
-    for i in range(2):
+    for _ in range(2):
         r = fake_client.post("/api/login", data={"username": "u", "password": "wrong"})
         assert r.status_code == 429
 
@@ -143,8 +143,10 @@ def test_login_success_clears_failures(monkeypatch):
     class FakeUser:
         username = "realuser"
 
-        class config:
+        class _Config:
             user = types.SimpleNamespace(password_last_update=123)
+
+        config = _Config()
 
     async def auth_ok(*_a, **_k):
         return FakeUser()  # type: ignore
@@ -154,9 +156,12 @@ def test_login_success_clears_failures(monkeypatch):
 
     monkeypatch.setattr(auth_mod, "authenticate_user", auth_ok)
     monkeypatch.setattr(auth_mod, "authenticate_system", sys_ok)
-    monkeypatch.setattr(Controller, "config", types.SimpleNamespace(
-        server=types.SimpleNamespace(token_expire_days=7, key_last_update=1, secret_key="test")
-    ))
+    monkeypatch.setattr(
+        Controller,
+        "config",
+        types.SimpleNamespace(server=types.SimpleNamespace(token_expire_days=7, key_last_update=1, secret_key="test")),
+        raising=False,
+    )
 
     # 先制造两次失败
     auth_rate_limiter.record_failure("testclient")

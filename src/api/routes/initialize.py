@@ -8,11 +8,11 @@ from src.core.controller import Controller
 from src.schemas.user import UserInfo
 from src.user.manager import UserManager
 from src.utils.logging import system_logger
+from src.utils.rate_limit import auth_rate_limiter
 from src.utils.tools import validate_password
 
 from ..auth import ip_depends  # noqa: TC001
 from ..server import BaseResponse, Server, app
-from src.utils.rate_limit import auth_rate_limiter
 
 
 class UserRequest(BaseModel):
