@@ -8,15 +8,37 @@ from typing import TYPE_CHECKING, Literal
 import cv2
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from src.core.controller import Controller
 from src.utils.anonymous import AnoymousTiebaMeow
 from src.utils.logging import exception_logger
 
-from ..server import app
+from ..auth import (
+    RESOURCE_TOKEN_TTL,
+    create_resource_access_token,
+    current_user_depends,
+    resource_access_depends,
+)
+from ..server import BaseResponse, app
 
 if TYPE_CHECKING:
     import numpy as np
+
+
+class ResourceTokenData(BaseModel):
+    token: str
+    expires_in: int
+
+
+@app.post("/resources/token", tags=["resources"])
+async def create_resource_token(user: current_user_depends) -> BaseResponse[ResourceTokenData]:
+    """签发短时效、仅授权 /resources/* 读图 的专用资源 token（P1-4）。
+
+    需要普通登录 token（Authorization: Bearer）认证；签发 scope=resources 的 HS256 JWT。
+    """
+    token = create_resource_access_token(user.username)
+    return BaseResponse(data=ResourceTokenData(token=token, expires_in=RESOURCE_TOKEN_TTL))
 
 
 class ResourceAPIExecutorManager:
@@ -46,7 +68,9 @@ def ndarray2image(image: np.ndarray | None) -> io.BytesIO:
 
 
 @app.get("/resources/portrait/{portrait}", tags=["resources"])
-async def get_portrait(portrait: str, size: Literal["s", "m", "l"] = "s") -> StreamingResponse:
+async def get_portrait(
+    portrait: str, size: Literal["s", "m", "l"] = "s", user: resource_access_depends = None
+) -> StreamingResponse:  # noqa: ANN001
     if not Controller.running:
         raise HTTPException(status_code=503, detail="Service Unavailable")
     with exception_logger("获取头像失败"):
@@ -60,7 +84,9 @@ async def get_portrait(portrait: str, size: Literal["s", "m", "l"] = "s") -> Str
 
 
 @app.get("/resources/image/{hash}", tags=["resources"])
-async def get_image(hash: str, size: Literal["s", "m", "l"] = "s") -> StreamingResponse:  # noqa: A002
+async def get_image(
+    hash: str, size: Literal["s", "m", "l"] = "s", user: resource_access_depends = None  # noqa: A002, ANN001
+) -> StreamingResponse:
     if not Controller.running:
         raise HTTPException(status_code=503, detail="Service Unavailable")
     with exception_logger("获取图片失败"):

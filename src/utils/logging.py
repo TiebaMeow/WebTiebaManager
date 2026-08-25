@@ -92,6 +92,23 @@ class ColorFormatter(logging.Formatter):
         return result
 
 
+class ExcludeResourceAccessFilter(logging.Filter):
+    """过滤掉 /resources/* 的 uvicorn access log（P1-4）。
+
+    避免 ?token= 落入访问日志/日志文件。uvicorn access record.args 形如
+    (client_addr, method, full_path, http_version, status_code)，full_path 即 args[2]。
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            args = record.args
+            if isinstance(args, tuple) and len(args) >= 3 and str(args[2]).startswith("/resources/"):
+                return False
+        except Exception:
+            pass
+        return True
+
+
 def get_uvicorn_log_config(name: str) -> dict:
     config = LOGGING_CONFIG.copy()
     config["formatters"] = {
@@ -110,6 +127,10 @@ def get_uvicorn_log_config(name: str) -> dict:
             "use_colors": True,
         },
     }
+
+    # /resources/* 的请求带 ?token=，禁止进入 access log（P1-4）
+    config["filters"] = {"exclude_resource": {"()": "src.utils.logging.ExcludeResourceAccessFilter"}}
+    config["handlers"]["access"]["filters"] = ["exclude_resource"]
 
     return config
 

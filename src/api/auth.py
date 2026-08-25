@@ -4,14 +4,17 @@ __all__ = [
     "system_access_depends",
     "ensure_system_access_depends",
     "ip_depends",
+    "resource_access_depends",
+    "create_resource_access_token",
+    "RESOURCE_TOKEN_TTL",
 ]
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import Annotated
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Annotated, Literal
 
 import jwt
-from fastapi import Depends, Form, HTTPException, Request, status
+from fastapi import Depends, Form, HTTPException, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
@@ -26,6 +29,9 @@ from .encryt import encrypt
 from .server import app
 
 ALGORITHM = "HS256"
+
+# 资源只读 token 默认有效期（秒）：15 分钟（P1-4，已确认固定常量）
+RESOURCE_TOKEN_TTL = 15 * 60
 
 # 登录失败统一延迟（秒）：叠加在认证失败路径上，使失败耗时趋于一致，
 # 避免仅靠随机 sleep 造成仍可观测的账号存在性差异（P1-3）。
@@ -147,6 +153,68 @@ async def parse_token(token: Annotated[str, Depends(oauth2_scheme)]):
     return user, system_access
 
 
+def create_resource_access_token(username: str, expires_delta: timedelta | None = None) -> str:
+    """签发短时效、仅授权 /resources/* 读图的专用资源 token（scope=resources，P1-4）。
+
+    复用现有 HS256 secret_key 签名，不新增密钥管理；claims 含 scope/exp/iat/sub。
+    注意：iat/exp 使用 UTC 时间，避免 naive 本地时间导致 PyJWT iat 校验失败。
+    """
+    now = datetime.now(UTC)
+    to_encode: dict = {"sub": username, "scope": "resources", "iat": now}
+    if expires_delta:
+        to_encode["exp"] = now + expires_delta
+    else:
+        to_encode["exp"] = now + timedelta(seconds=RESOURCE_TOKEN_TTL)
+    return jwt.encode(to_encode, Controller.config.server.secret_key, algorithm=ALGORITHM)
+
+
+async def get_resource_access(  # noqa: ANN201
+    request: Request, token: str | None = Query(default=None)
+):
+    """供 GET /resources/* 使用的统一鉴权依赖。
+
+    从 query `?token=` 或 `Authorization: Bearer` 读取资源 token；
+    校验签名 + scope=="resources" + exp 未过 + sub 用户仍存在；失败 401。
+    普通全权限 access token（无 resources scope）必须被拒绝。
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    raw = token
+    if not raw:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            raw = auth_header[7:]
+
+    if not raw:
+        raise credentials_exception
+
+    try:
+        payload = jwt.decode(raw, Controller.config.server.secret_key, algorithms=[ALGORITHM])
+    except InvalidTokenError:
+        raise credentials_exception  # noqa: B904
+
+    if payload.get("scope") != "resources":
+        # 全权限 access token 或无资源 scope 的 token 一律拒绝
+        raise credentials_exception
+
+    username = payload.get("sub")
+    if not username:
+        raise credentials_exception
+
+    user = UserManager.get_user(username)
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+resource_access_depends = Annotated[User, Depends(get_resource_access)]
+
+
 async def get_current_user(data: Annotated[tuple[User, bool], Depends(parse_token)]):  # noqa: FURB118
     return data[0]
 
@@ -182,7 +250,9 @@ ip_depends = Annotated[str | None, Depends(get_ip)]
 async def login_for_access_token(form_data: Annotated[AdvancedOAuth2RequestForm, Depends()], ip: ip_depends) -> Token:
     ip_key = ip or "unknown"
     if auth_rate_limiter.is_locked(ip_key):
-        raise HTTPException(status_code=429, detail="登录失败次数过多，请稍后再试", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=429, detail="登录失败次数过多，请稍后再试", headers={"WWW-Authenticate": "Bearer"}
+        )
     try:
         user = await authenticate_user(form_data.username, form_data.password)
         system_access = await authenticate_system(form_data.key)
