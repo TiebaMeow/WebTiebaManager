@@ -75,10 +75,13 @@ async def global_exception_handler(request: Request, exc: Exception):
             content={"message": exc.detail},
         )
     system_logger.exception(f"服务器捕获到未经处理的异常. {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"message": "服务器内部错误", "detail": str(exc)},
-    )
+    # 非 DEV 环境不回显异常详情，防止泄露内部路径/配置/堆栈（P1-6）
+    if DEV:
+        return JSONResponse(
+            status_code=500,
+            content={"message": "服务器内部错误", "detail": str(exc)},
+        )
+    return JSONResponse(status_code=500, content={"message": "服务器内部错误"})
 
 
 class BaseResponse[T](BaseModel):
