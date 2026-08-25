@@ -339,6 +339,138 @@ async def test_clear_contents_before(setup_db):
     assert {5002, 5003}.issubset(left)
 
 
+@pytest.mark.asyncio
+async def test_check_and_update_cache_many(setup_db):
+    # P2-4: 批量检查/更新缓存，状态与输入顺序一致
+    import src.schemas.tieba as tieba
+
+    now_ts = int(datetime.now(SH_TZ).timestamp())
+    user = tieba.User(user_name="u", nick_name="n", user_id=98765, portrait="p", level=1)
+
+    post_new = tieba.Post(
+        fname="f1",
+        title="t1",
+        text="x",
+        images=[],
+        create_time=now_ts,
+        tid=6001,
+        pid=6001,
+        floor=1,
+        reply_num=4,
+        user=user,
+    )
+    comment_new = tieba.Comment(
+        fname="f2",
+        title="t2",
+        text="c",
+        images=[],
+        create_time=now_ts,
+        tid=6002,
+        pid=6002,
+        floor=2,
+        user=user,
+    )
+    thread_new = tieba.Thread(
+        fname="f3",
+        title="t3",
+        text="x",
+        images=[],
+        create_time=now_ts,
+        tid=6003,
+        pid=6003,
+        floor=1,
+        last_time=now_ts,
+        reply_num=3,
+        user=user,
+    )
+
+    # 全部为新内容：post reply_num=4 -> NEW，comment -> NEW，thread reply_num=3 -> NEW_WITH_CHILD
+    statuses = await Database.check_and_update_cache_many([post_new, comment_new, thread_new])
+    assert statuses == [dbi.UpdateStatus.NEW, dbi.UpdateStatus.NEW, dbi.UpdateStatus.NEW_WITH_CHILD]
+
+    await Database.save_items(
+        [ContentModel.from_content(post_new), ContentModel.from_content(thread_new)],
+        on_conflict="ignore",
+    )
+
+    # 已入库且无变化 -> UNCHANGED；reply_num 变化 -> UPDATED；comment 仍未入库 -> NEW
+    post_new.reply_num = 8
+    statuses2 = await Database.check_and_update_cache_many([post_new, comment_new])
+    assert statuses2 == [dbi.UpdateStatus.UPDATED, dbi.UpdateStatus.NEW]
+
+    # 缓存已被批量更新为最新值
+    got = await Database.get_contents_by_pids([6001])
+    assert got[0].reply_num == 8
+
+    # 批量内同 pid 重复：后项覆盖前项（首项相对缓存 8 无变化，次项 12 为 UPDATED）
+    post_later = post_new.model_copy(update={"reply_num": 12})
+    statuses3 = await Database.check_and_update_cache_many([post_new, post_later])
+    assert statuses3 == [dbi.UpdateStatus.UNCHANGED, dbi.UpdateStatus.UPDATED]
+    got2 = await Database.get_contents_by_pids([6001])
+    assert got2[0].reply_num == 12
+
+
+@pytest.mark.asyncio
+async def test_flush_content_buffer_broadcast_order_and_failure(setup_db, monkeypatch):
+    # P2-4: 整 chunk 提交成功后才按原顺序广播；保存异常时该 chunk 不被广播
+    import src.schemas.tieba as tieba
+    from src.core.controller import Controller
+    from src.schemas.process import ProcessObject
+    from src.tieba.crawler import Crawler
+
+    now_ts = int(datetime.now(SH_TZ).timestamp())
+    user = tieba.User(user_name="u", nick_name="n", user_id=12345, portrait="p", level=1)
+
+    def make_post(pid):
+        return tieba.Post(
+            fname="f1",
+            title=f"t-{pid}",
+            text="x",
+            images=[],
+            create_time=now_ts,
+            tid=7000,
+            pid=pid,
+            floor=pid,
+            reply_num=4,
+            user=user,
+        )
+
+    buffers = [(ProcessObject(content=make_post(pid)), ContentModel.from_content(make_post(pid))) for pid in (7001, 7002)]
+
+    # 广播处理器在广播时查询数据库：对应 chunk 的全部内容必须已经提交
+    seen: list[int] = []
+    broadcast_db_snapshots: list[set[int]] = []
+
+    async def spy(process_object):
+        items = await Database.get_contents_by_pids([7001, 7002])
+        broadcast_db_snapshots.append({i.pid for i in items})
+        seen.append(process_object.content.pid)
+
+    listener = Controller.DispatchContent.on(spy)
+    try:
+        await Crawler._flush_content_buffer(buffers)
+    finally:
+        listener.un_register()
+
+    # 按原抓取顺序广播，且每次广播时 chunk 内容已全部入库
+    assert seen == [7001, 7002]
+    assert broadcast_db_snapshots == [{7001, 7002}, {7001, 7002}]
+    assert {i.pid for i in await Database.get_contents_by_pids([7001, 7002])} == {7001, 7002}
+
+    # 数据库保存失败：不得广播该 chunk
+    async def boom(*_a, **_k):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(Database, "save_items", boom)
+    seen2: list[int] = []
+    listener2 = Controller.DispatchContent.on(lambda obj: seen2.append(obj.content.pid))
+    try:
+        await Crawler._flush_content_buffer(buffers)
+    finally:
+        listener2.un_register()
+    assert seen2 == []
+
+
 class _RecordingEngineProxy:
     """包装真实引擎，记录 dispose 调用（用于断言连接池被释放）。"""
 

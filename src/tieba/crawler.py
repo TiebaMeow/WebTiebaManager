@@ -151,9 +151,9 @@ class Spider:
                     data = await self.client.get_threads(forum, pn=i)
                     raw_threads.extend(data.objs)
 
-        for thread in raw_threads:
-            updated = await Database.check_and_update_cache(thread)
-
+        for thread, updated in zip(
+                raw_threads, await Database.check_and_update_cache_many(raw_threads), strict=True
+            ):
             # NEW or NEW_WITH_CHILD
             if updated & UpdateStatus.IS_NEW and need.thread:
                 yield ProcessObject(content=Thread.from_aiotieba_data(thread), dto=convert_aiotieba_thread(thread))
@@ -195,10 +195,11 @@ class Spider:
                             raw_posts.append(post)
                             raw_comments.extend(post.comments)
 
-            for post in raw_posts:
+            for post, updated in zip(
+                raw_posts, await Database.check_and_update_cache_many(raw_posts), strict=True
+            ):
                 if post.floor == 1:
                     continue
-                updated = await Database.check_and_update_cache(post)
 
                 if updated & UpdateStatus.IS_NEW and need.post:
                     yield ProcessObject(content=Post.from_dto(post, title=thread.title), dto=post)
@@ -214,8 +215,9 @@ class Spider:
                         )
                         raw_comments.extend(data.objs)
 
-            for comment in raw_comments:
-                updated = await Database.check_and_update_cache(comment)
+            for comment, updated in zip(
+                raw_comments, await Database.check_and_update_cache_many(raw_comments), strict=True
+            ):
                 if updated & UpdateStatus.IS_NEW and need.comment:
                     yield ProcessObject(content=Comment.from_dto(comment, title=thread.title), dto=comment)
 
@@ -294,6 +296,23 @@ class Crawler:
             cls.task = asyncio.create_task(cls.crawl())
 
     @classmethod
+    async def _flush_content_buffer(cls, buffered: list[tuple[ProcessObject, ContentModel]]):
+        """P2-4: 批量写入内容缓存并维护「规则判断前必须入库」的时序。
+
+        整个 chunk 一次性提交成功后才按原抓取顺序广播（不在每次广播前单独 flush）；
+        数据库保存失败时跳过该 chunk 的广播——内容未入库，规则判断依赖数据库内容，
+        其内容留待下一轮爬取重新发现（缓存未更新）。
+        """
+        try:
+            await Database.save_items([model for _, model in buffered], on_conflict="ignore")
+        except Exception:
+            system_logger.exception(f"批量保存爬取内容失败，共 {len(buffered)} 条内容本次不予广播")
+            return
+
+        for process_object, _ in buffered:
+            await Controller.DispatchContent.broadcast(process_object)
+
+    @classmethod
     async def crawl(cls):
         while True:
             users: dict[int, UserModel] = {}
@@ -302,6 +321,10 @@ class Crawler:
             with exception_logger("爬虫任务发生异常"):
                 for forum, need in cls.needs.items():
                     user_levels: dict[int, UserLevelModel] = {}
+
+                    # P2-4: per-forum 内容缓冲，攒满 chunk 后批量写入，每吧结束收尾 flush
+                    content_buffer: list[tuple[ProcessObject, ContentModel]] = []
+                    chunk_size = 200
 
                     async for process_object in cls.get_spider().crawl(forum, need):
                         content = process_object.content
@@ -316,11 +339,14 @@ class Crawler:
                             ulm = user_levels[content.user.user_id]
                             ulm.level = max(ulm.level, content.user.level)
 
-                        # TODO 优化插入逻辑，使得content能在爬取结束后批量插入
-                        # note 规则判断依赖已插入数据库的内容，需要再判断前插入
-                        await Database.save_items([ContentModel.from_content(content)])
+                        # note 规则判断依赖已插入数据库的内容；整 chunk 提交后再按序广播
+                        content_buffer.append((process_object, ContentModel.from_content(content)))
+                        if len(content_buffer) >= chunk_size:
+                            await cls._flush_content_buffer(content_buffer)
+                            content_buffer = []
 
-                        await Controller.DispatchContent.broadcast(process_object)
+                    if content_buffer:
+                        await cls._flush_content_buffer(content_buffer)
 
                     user_level_ids = list(user_levels.keys())
                     async with Database.get_session() as session:

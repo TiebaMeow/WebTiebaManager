@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Literal, cast
 
 import aiotieba.typing as aiotieba
 from pydantic import ValidationError
-from sqlalchemy import delete, select, update
+from sqlalchemy import case, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -331,26 +331,9 @@ class Database:
             async for row in result.scalars():
                 yield row
 
-    @classmethod
-    async def check_and_update_cache(cls, content: MixedContentType) -> UpdateStatus:
-        async with cls.get_session() as session:
-            session.begin()
-            if isinstance(content, (CommentDTO)):
-                real_pid = content.cid
-            else:
-                real_pid = content.pid
-            result = await session.execute(
-                select(ContentModel.last_time, ContentModel.reply_num).where(ContentModel.pid == real_pid)
-            )
-            row = result.first()
-            content_cache = None if row is None else (row[0], row[1])
-            await session.execute(
-                update(ContentModel)
-                .where(ContentModel.pid == real_pid)
-                .values(last_time=getattr(content, "last_time", None), reply_num=getattr(content, "reply_num", None))
-            )
-            await session.commit()
-
+    @staticmethod
+    def _calc_update_status(content: MixedContentType, content_cache: tuple | None) -> UpdateStatus:
+        """根据旧缓存计算单条内容的更新状态（P2-4 提取，供批量/单条共用）。"""
         updated = UpdateStatus.UNCHANGED
         if isinstance(content, (aiotieba.Thread, ThreadDTO, Thread)):
             if content_cache is None:
@@ -367,6 +350,63 @@ class Database:
                 updated = UpdateStatus.NEW
 
         return updated
+
+    @classmethod
+    async def check_and_update_cache_many(cls, contents: Iterable[MixedContentType]) -> list[UpdateStatus]:
+        """
+        批量检查并更新内容缓存（P2-4）。
+
+        在仍掌握一批原始爬虫对象的层面完成：一次批量读取旧缓存、计算每项 UpdateStatus，
+        再在单事务内一次性更新缓存，避免逐项查询/提交。返回与输入顺序一致的
+        UpdateStatus 列表。
+
+        同一 pid 在批量内多次出现时，后出现的值覆盖先出现的值（与逐条处理语义一致）。
+        """
+        content_list = list(contents)
+        if not content_list:
+            return []
+
+        # Comment 使用 cid 作为真实 pid，其余类型使用 pid
+        pids = [content.cid if isinstance(content, CommentDTO) else content.pid for content in content_list]
+        pid_set = set(pids)
+
+        async with cls.get_session() as session:
+            # 批量读取旧缓存
+            result = await session.execute(
+                select(ContentModel.pid, ContentModel.last_time, ContentModel.reply_num).where(
+                    ContentModel.pid.in_(pid_set)
+                )
+            )
+            old_cache = {row[0]: (row[1], row[2]) for row in result.all()}
+
+            # 计算每项状态（与输入顺序对齐）
+            statuses = [
+                cls._calc_update_status(content, old_cache.get(pid))
+                for content, pid in zip(content_list, pids, strict=True)
+            ]
+
+            # 一次性更新缓存：同 pid 后项覆盖前项
+            last_time_map: dict[int, int | None] = {}
+            reply_num_map: dict[int, int | None] = {}
+            for pid, content in zip(pids, content_list, strict=True):
+                last_time_map[pid] = getattr(content, "last_time", None)
+                reply_num_map[pid] = getattr(content, "reply_num", None)
+
+            await session.execute(
+                update(ContentModel)
+                .where(ContentModel.pid.in_(pid_set))
+                .values(
+                    last_time=case(last_time_map, value=ContentModel.pid),
+                    reply_num=case(reply_num_map, value=ContentModel.pid),
+                )
+            )
+            await session.commit()
+
+        return statuses
+
+    @classmethod
+    async def check_and_update_cache(cls, content: MixedContentType) -> UpdateStatus:
+        return (await cls.check_and_update_cache_many([content]))[0]
 
     @classmethod
     async def clear_contents_before(cls, before: datetime) -> int:
