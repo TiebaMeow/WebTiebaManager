@@ -162,7 +162,8 @@ def test_cache_cleaner_restart_boundary(monkeypatch):
     assert cache.CacheCleaner._clear_cache_scheduler is None
     cache.CacheCleaner.start()
     third = cache.CacheCleaner._clear_cache_scheduler
-    assert third is not first and third is not second
+    assert third is not first
+    assert third is not second
     assert third.running is True
     assert len(third.jobs) == 1
 
