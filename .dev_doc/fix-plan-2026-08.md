@@ -58,7 +58,7 @@
 | 4 | P1-4 资源代理端点无鉴权（**方案已确认：短时专用资源 token，前后端分别实施**） | ☑ 已完成 | `4362433` |
 | 5 | P1-5 反代原样转发浏览器头（白名单转发） | ☑ 已完成 | `6e9a859` |
 | 6 | P1-6 500 响应回显异常详情（仅 DEV 回显） | ☑ 已完成 | `af80630` |
-| 7 | P2-1 `test_connection` 连接池泄漏（try/finally dispose） | ☐ 未开始 | - |
+| 7 | P2-1 `test_connection` 连接池泄漏（try/finally dispose） | ☑ 已完成 | `23c455a` |
 | 8 | P2-2 `confirm_many` 后台任务异常无人处理 + 并发（try/except + 每用户 Lock） | ☐ 未开始 | - |
 | 9 | P2-3 `CacheCleaner` 重启边界 + `cleanup_time` 无校验 | ☐ 未开始 | - |
 | 10 | P2-4 爬虫逐内容小事务（per-forum 缓冲批量写入 + 缓存批量更新） | ☐ 未开始 | - |
