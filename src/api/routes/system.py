@@ -20,6 +20,7 @@ from src.utils.tools import random_str, validate_password
 
 from ..auth import ensure_system_access_depends, ip_depends  # noqa: TC001
 from ..server import BaseResponse, Server, app
+from src.utils.rate_limit import auth_rate_limiter
 
 
 @app.post("/api/system/clear_cache", tags=["clear_cache"], description="手动清理缓存")
@@ -135,10 +136,16 @@ class RegisterRequest(BaseModel):
 
 @app.post("/api/register", tags=["register"])
 async def register_user(req: RegisterRequest, ip: ip_depends) -> BaseResponse[bool]:
+    ip_key = ip or "unknown"
+    if auth_rate_limiter.is_locked(ip_key):
+        raise HTTPException(status_code=429, detail="注册尝试次数过多，请稍后再试")
+
     if UserManager.get_user(req.username):
+        auth_rate_limiter.record_failure(ip_key)
         return BaseResponse(code=400, data=False, message="用户名已存在")
 
     if not (data := await CodeCache.get(req.code)):
+        auth_rate_limiter.record_failure(ip_key)
         return BaseResponse(code=400, data=False, message="邀请码无效")
 
     config = UserConfig(
@@ -153,10 +160,12 @@ async def register_user(req: RegisterRequest, ip: ip_depends) -> BaseResponse[bo
     try:
         await UserManager.new_user(config)
     except Exception as e:
+        auth_rate_limiter.record_failure(ip_key)
         return BaseResponse(data=False, message=str(e))
 
     await CodeCache.delete(req.code)
 
+    auth_rate_limiter.clear(ip_key)
     system_logger.info(f"用户 {req.username} 注册成功 IP: {ip}")
     return BaseResponse(data=True, message="注册成功，请使用用户名和密码登录")
 

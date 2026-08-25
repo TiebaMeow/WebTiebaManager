@@ -10,7 +10,9 @@ from src.user.manager import UserManager
 from src.utils.logging import system_logger
 from src.utils.tools import validate_password
 
+from ..auth import ip_depends  # noqa: TC001
 from ..server import BaseResponse, Server, app
+from src.utils.rate_limit import auth_rate_limiter
 
 
 class UserRequest(BaseModel):
@@ -58,11 +60,16 @@ async def get_initialize_info() -> BaseResponse[GetInitializeInfoData]:
 
 
 @app.post("/api/initialize/initialize", tags=["initialize"])
-async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
+async def initialize_post(request: InitializeRequest, ip: ip_depends = None) -> BaseResponse[None]:  # noqa: ANN001
+    ip_key = ip or "unknown"
+    if auth_rate_limiter.is_locked(ip_key):
+        raise HTTPException(status_code=429, detail="初始化尝试次数过多，请稍后再试")
+
     if not Server.need_initialize():
         raise HTTPException(status_code=400, detail="系统已经初始化")
 
     if request.secure_key != Server.secure_key():
+        auth_rate_limiter.record_failure(ip_key)
         raise HTTPException(status_code=400, detail="初始化密钥错误")
 
     if Server.need_user():
@@ -77,6 +84,10 @@ async def initialize_post(request: InitializeRequest) -> BaseResponse[None]:
 
         system_config = SystemConfig(server=ServerConfig.model_validate(request.system.model_dump()))
         await Controller.update_config(system_config)
+
+    # 初始化成功后立即丢弃安全密钥，避免其残留在内存直到进程结束（P1-3）
+    Server._secure_key = None
+    auth_rate_limiter.clear(ip_key)
 
     system_logger.info("系统初始化完成，程序将在配置应用后自动重启...")
     await Server.shutdown_task(restart=True, shutdown_timeout=3)

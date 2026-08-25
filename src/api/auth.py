@@ -6,6 +6,7 @@ __all__ = [
     "ip_depends",
 ]
 
+import asyncio
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -19,11 +20,20 @@ from pydantic import BaseModel, Field
 from src.core.controller import Controller
 from src.user.manager import User, UserManager
 from src.utils.logging import system_logger
+from src.utils.rate_limit import auth_rate_limiter
 
 from .encryt import encrypt
 from .server import app
 
 ALGORITHM = "HS256"
+
+# 登录失败统一延迟（秒）：叠加在认证失败路径上，使失败耗时趋于一致，
+# 避免仅靠随机 sleep 造成仍可观测的账号存在性差异（P1-3）。
+LOGIN_FAILURE_DELAY = 0.2
+
+# 用户不存在时用于对齐校验路径的 dummy 存储哈希（P1-3）。
+# 仅用于时序侧信道防护，不会匹配任何真实密码。
+DUMMY_PASSWORD_HASH = "$2b$12$dummy.dummy.dummy.dummy.dummy.dummy.notmatch"
 
 
 class AdvancedOAuth2RequestForm(OAuth2PasswordRequestForm):
@@ -73,7 +83,10 @@ async def authenticate_user(username: str, password: str):
     user_expection = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的用户名或密码", headers={"WWW-Authenticate": "Bearer"}
     )
-    if not (user := UserManager.get_user(username)):
+    user = UserManager.get_user(username)
+    if user is None:
+        # 用户不存在时也执行一次等价的密码校验路径，避免时序侧信道泄露账号存在性（P1-3）
+        verify_password(password, DUMMY_PASSWORD_HASH)
         raise user_expection
     if not verify_password(password, user.config.user.password):
         raise user_expection
@@ -167,11 +180,21 @@ ip_depends = Annotated[str | None, Depends(get_ip)]
 
 @app.post("/api/login", tags=["token"])
 async def login_for_access_token(form_data: Annotated[AdvancedOAuth2RequestForm, Depends()], ip: ip_depends) -> Token:
+    ip_key = ip or "unknown"
+    if auth_rate_limiter.is_locked(ip_key):
+        raise HTTPException(status_code=429, detail="登录失败次数过多，请稍后再试", headers={"WWW-Authenticate": "Bearer"})
     try:
         user = await authenticate_user(form_data.username, form_data.password)
         system_access = await authenticate_system(form_data.key)
     except HTTPException as e:
         system_logger.warning(f"用户 {form_data.username} 登录失败 IP: {ip}")
+        # 统一失败延迟：使失败耗时趋于一致，避免账号存在性时序侧信道（P1-3）
+        await asyncio.sleep(LOGIN_FAILURE_DELAY)
+        auth_rate_limiter.record_failure(ip_key)
+        if auth_rate_limiter.is_locked(ip_key):
+            raise HTTPException(
+                status_code=429, detail="登录失败次数过多，请稍后再试", headers={"WWW-Authenticate": "Bearer"}
+            ) from None
         raise e
     access_token_expires = timedelta(days=Controller.config.server.token_expire_days)
     access_token = create_access_token(
@@ -183,4 +206,6 @@ async def login_for_access_token(form_data: Annotated[AdvancedOAuth2RequestForm,
         expires_delta=access_token_expires,
     )
     system_logger.info(f"用户 {user.username} 登录成功 IP: {ip} 系统权限: {'是' if system_access else '否'}")
+    # 登录成功后清除该 IP 的失败记录，正常用户不受限流影响（P1-3）
+    auth_rate_limiter.clear(ip_key)
     return Token(access_token=access_token, token_type="bearer", system_access=system_access)
