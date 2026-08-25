@@ -6,6 +6,7 @@ from cashews import Cache
 from cashews.backends.interface import NOT_EXIST, UNLIMITED
 
 from src.core.controller import Controller
+from src.utils.logging import system_logger
 
 from .event import AsyncEvent
 
@@ -24,13 +25,29 @@ class CacheCleaner:
             cls._clear_cache_scheduler = AsyncIOScheduler()
 
     @classmethod
+    def is_valid_cleanup_time(cls, value: str) -> bool:
+        """校验清理时间是否为合法的 HH:MM（P2-3）。"""
+        try:
+            hour_str, minute_str = value.split(":")
+            hour, minute = int(hour_str), int(minute_str)
+        except ValueError:
+            return False
+        return 0 <= hour <= 23 and 0 <= minute <= 59
+
+    @classmethod
     async def clear_cache(cls):
         await ClearCache.broadcast(None)
 
     @classmethod
     def setup_job(cls):
+        if cls._clear_cache_scheduler is None:
+            system_logger.error("清理调度器尚未初始化，无法注册清理任务")
+            return
+        if not cls.is_valid_cleanup_time(cls._clear_cache_time):
+            system_logger.error(f"清理时间配置无效: {cls._clear_cache_time!r}，保持原有清理任务")
+            return
         hour, minute = map(int, cls._clear_cache_time.split(":"))
-        cls._clear_cache_scheduler.add_job(  # type: ignore
+        cls._clear_cache_scheduler.add_job(
             cls.clear_cache,
             trigger=CronTrigger(hour=hour, minute=minute),
             id="clear_cache_job",
@@ -41,19 +58,41 @@ class CacheCleaner:
 
     @classmethod
     def start(cls, _=None):
-        cls.initialize()
+        # P2-3: 重启边界修复——APScheduler 在 shutdown 后 running 可能仍为 True 且无法再次
+        # start（抛 SchedulerAlreadyRunningError），已 shutdown 的实例不能复用，统一丢弃重建；
+        # 运行中的旧实例先停止，保证连续 start() 幂等。
+        if cls._clear_cache_scheduler is not None:
+            old_scheduler = cls._clear_cache_scheduler
+            try:
+                if old_scheduler.running:
+                    old_scheduler.shutdown(wait=False)
+            except Exception:
+                # 旧实例可能已 shutdown 且其事件循环已关闭，无法再停止，直接丢弃重建
+                system_logger.warning("清理调度器旧实例无法停止，已丢弃并重建")
+        cls._clear_cache_scheduler = AsyncIOScheduler()
         cls.setup_job()
-        cls._clear_cache_scheduler.start()  # type: ignore
+        cls._clear_cache_scheduler.start()
 
     @classmethod
     def stop(cls, _=None):
-        if cls._clear_cache_scheduler and cls._clear_cache_scheduler.running:
-            cls._clear_cache_scheduler.shutdown()
+        if cls._clear_cache_scheduler is not None:
+            old_scheduler = cls._clear_cache_scheduler
+            try:
+                if old_scheduler.running:
+                    old_scheduler.shutdown(wait=False)
+            except Exception:
+                system_logger.warning("清理调度器停止失败，实例将被丢弃")
+            # P2-3: shutdown 后的实例不能复用，置空以便下次 start 时重建
+            cls._clear_cache_scheduler = None
 
     @classmethod
     def update_clear_cache_time(cls, _=None):
-        if Controller.config.cleanup_time != cls._clear_cache_time:
-            cls._clear_cache_time = Controller.config.cleanup_time
+        new_time = Controller.config.cleanup_time
+        if new_time != cls._clear_cache_time:
+            if not cls.is_valid_cleanup_time(new_time):
+                system_logger.error(f"清理时间配置无效: {new_time!r}，保持原有清理任务")
+                return
+            cls._clear_cache_time = new_time
             cls.setup_job()
 
 

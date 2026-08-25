@@ -340,6 +340,19 @@ class SystemConfig(BaseModel, extra="ignore"):
     )
     cleanup_time: str = "04:00"  # 缓存清理时间，格式如 "HH:MM"
 
+    @field_validator("cleanup_time")
+    @classmethod
+    def validate_cleanup_time(cls, v: str) -> str:
+        # P2-3: 拒绝非法 HH:MM，避免无效配置先写盘
+        try:
+            hour_str, minute_str = v.split(":")
+            hour, minute = int(hour_str), int(minute_str)
+        except ValueError:
+            raise ValueError(f"清理时间格式无效: {v!r}，需为 HH:MM（00:00-23:59）")  # noqa: B904
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError(f"清理时间超出范围: {v!r}，需为 HH:MM（00:00-23:59）")
+        return v
+
     @property
     def mosaic(self):
         config = self.model_copy(deep=True)

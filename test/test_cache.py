@@ -111,7 +111,7 @@ class DummyScheduler:
     def start(self):
         self.running = True
 
-    def shutdown(self):
+    def shutdown(self, wait=True):  # noqa: A002
         self.running = False
 
 
@@ -138,6 +138,96 @@ def test_cache_cleaner_start_update_stop(monkeypatch):
     assert cache.CacheCleaner._clear_cache_time == "05:30"
     assert len(sched.jobs) == 2
 
-    # stop 停止调度器
+    # stop 停止调度器，并置空以便下次 start 重建
     cache.CacheCleaner.stop()
     assert sched.running is False
+    assert cache.CacheCleaner._clear_cache_scheduler is None
+
+
+def test_cache_cleaner_restart_boundary(monkeypatch):
+    # P2-3: 连续 start / 停止后再启动均不炸，且重建新实例只注册一个 clear_cache_job
+    monkeypatch.setattr(cache, "AsyncIOScheduler", DummyScheduler)
+    cache.CacheCleaner._clear_cache_scheduler = None
+    cache.CacheCleaner._clear_cache_time = "04:00"
+
+    cache.CacheCleaner.start()
+    first = cache.CacheCleaner._clear_cache_scheduler
+    cache.CacheCleaner.start()
+    second = cache.CacheCleaner._clear_cache_scheduler
+    assert second is not first
+    assert second.running is True
+    assert len(second.jobs) == 1
+
+    cache.CacheCleaner.stop()
+    assert cache.CacheCleaner._clear_cache_scheduler is None
+    cache.CacheCleaner.start()
+    third = cache.CacheCleaner._clear_cache_scheduler
+    assert third is not first and third is not second
+    assert third.running is True
+    assert len(third.jobs) == 1
+
+
+def test_cache_cleaner_invalid_cleanup_time(monkeypatch):
+    # P2-3: 非法清理时间不注册任务且有告警日志
+    from loguru import logger
+
+    monkeypatch.setattr(cache, "AsyncIOScheduler", DummyScheduler)
+    cache.CacheCleaner._clear_cache_scheduler = None
+    cache.CacheCleaner._clear_cache_time = "25:99"
+
+    records: list[str] = []
+
+    def sink_fn(message):
+        records.append(str(message))
+
+    sink_id = logger.add(sink_fn, level="ERROR")
+    try:
+        cache.CacheCleaner.start()
+    finally:
+        logger.remove(sink_id)
+
+    sched = cache.CacheCleaner._clear_cache_scheduler
+    assert isinstance(sched, DummyScheduler)
+    assert len(sched.jobs) == 0
+    assert any("清理时间配置无效" in r for r in records)
+
+
+def test_cache_cleaner_update_invalid_time_keeps_old_job(monkeypatch):
+    # P2-3: update 收到非法值（如 "25:99"）时保持旧清理时间与旧调度任务
+    from loguru import logger
+
+    monkeypatch.setattr(cache, "AsyncIOScheduler", DummyScheduler)
+    cache.CacheCleaner._clear_cache_scheduler = None
+    cache.CacheCleaner._clear_cache_time = "04:00"
+    cache.CacheCleaner.start()
+    sched = cache.CacheCleaner._clear_cache_scheduler
+    assert len(sched.jobs) == 1
+
+    records: list[str] = []
+
+    def sink_fn(message):
+        records.append(str(message))
+
+    sink_id = logger.add(sink_fn, level="ERROR")
+    try:
+        cache.Controller.config.cleanup_time = "25:99"
+        cache.CacheCleaner.update_clear_cache_time()
+    finally:
+        logger.remove(sink_id)
+
+    assert cache.CacheCleaner._clear_cache_time == "04:00"
+    assert len(sched.jobs) == 1
+    assert any("清理时间配置无效" in r for r in records)
+
+
+def test_system_config_rejects_invalid_cleanup_time():
+    # P2-3: 非法 HH:MM 在模型校验阶段被拒绝，避免无效配置先写盘
+    from pydantic import ValidationError
+
+    from src.core.config import SystemConfig
+
+    with pytest.raises(ValidationError):
+        SystemConfig(cleanup_time="25:99")
+    with pytest.raises(ValidationError):
+        SystemConfig(cleanup_time="foo")
+    assert SystemConfig(cleanup_time="04:30").cleanup_time == "04:30"
