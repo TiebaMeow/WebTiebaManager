@@ -80,7 +80,7 @@ def _status_and_text(collected):
     return status, text
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_cache(tmp_path, monkeypatch):
     """将 WEBUI_CACHE 指向临时目录，避免污染真实缓存。"""
     cache_dir = tmp_path / "webui"
@@ -160,3 +160,82 @@ def test_normalize_relative_path_rejects_dotdot():
 
     assert webui._normalize_relative_path("a/b.js") == "a/b.js"
     assert webui._normalize_relative_path("./a") == "a"
+
+
+# ---------- P1-5 反向代理头白名单转发 ----------
+
+
+class _FakeAiohttpSession:
+    def __init__(self):
+        self.sent_headers = None
+
+    def get(self, url, headers=None):
+        self.sent_headers = headers or {}
+        return _FakeResp()
+
+
+class _FakeResp:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return None
+
+    async def read(self):
+        return b"OK"
+
+    @property
+    def status(self):
+        return 200
+
+    @property
+    def headers(self):
+        return {"Content-Type": "text/html"}
+
+
+@pytest.fixture
+def fake_http_session(monkeypatch):
+    session = _FakeAiohttpSession()
+
+    async def fake_session():
+        return session
+
+    monkeypatch.setattr(webui.AnonymousAiohttp, "session", fake_session)
+    return session
+
+
+def test_reverse_proxy_whitelist_headers_only(fake_http_session):
+    from starlette.datastructures import Headers
+
+    headers = Headers(
+        raw=[
+            (b"host", b"example.com"),
+            (b"cookie", b"sid=secret"),
+            (b"authorization", b"Bearer secret-token"),
+            (b"referer", b"https://evil.example"),
+            (b"origin", b"https://evil.example"),
+            (b"x-custom", b"custom-value"),
+            (b"accept", b"text/html"),
+            (b"accept-encoding", b"gzip, deflate, br"),
+            (b"accept-language", b"zh-CN"),
+            (b"user-agent", b"TestAgent/1.0"),
+            (b"cache-control", b"no-cache"),
+        ]
+    )
+
+    async def run():
+        return await webui.reverse_proxy("https://target.example/file", types.SimpleNamespace(headers=headers))
+
+    text, status, resp_headers = asyncio.run(run())
+
+    sent = {k.lower(): v for k, v in (fake_http_session.sent_headers or {}).items()}
+    # 白名单头保留
+    assert sent.get("accept") == "text/html"
+    assert sent.get("accept-encoding") == "gzip, deflate, br"
+    assert sent.get("accept-language") == "zh-CN"
+    assert sent.get("user-agent") == "TestAgent/1.0"
+    assert sent.get("cache-control") == "no-cache"
+    # 敏感/自定义头必须被剥离
+    for forbidden in ("cookie", "authorization", "referer", "origin", "x-custom", "host"):
+        assert forbidden not in sent
+    assert text == b"OK"

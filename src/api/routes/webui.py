@@ -139,11 +139,28 @@ async def load_local_asset(rel_path: str) -> LocalAsset | None:
     return await _read_from_zip(normalized_path)
 
 
+# 反代转发头白名单（P1-5）：仅转发浏览器请求中必要且无害的头，
+# 显式剥离 Cookie / Authorization / Referer / Origin 及所有 X-* 自定义头，防止登录态/凭据泄露给第三方。
+PROXY_HEADER_WHITELIST = frozenset(
+    {
+        "accept",
+        "accept-encoding",
+        "accept-language",
+        "user-agent",
+        "cache-control",
+    }
+)
+
+
+def build_proxy_headers(request: Request) -> dict[str, str]:
+    return {key: value for key, value in request.headers.items() if key.lower() in PROXY_HEADER_WHITELIST}
+
+
 async def reverse_proxy(url: str, request: Request, raw=False):
     system_logger.debug(f"反向代理请求: {url}")
     try:
         session = await AnonymousAiohttp.session()
-        headers = {key: value for key, value in request.headers.items() if key != "host"}
+        headers = build_proxy_headers(request)
         async with session.get(url, headers=headers) as resp:
             data = await resp.read()
             headers = dict(resp.headers)
