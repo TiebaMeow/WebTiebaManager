@@ -59,7 +59,7 @@
 | 5 | P1-5 反代原样转发浏览器头（白名单转发） | ☑ 已完成 | `6e9a859` |
 | 6 | P1-6 500 响应回显异常详情（仅 DEV 回显） | ☑ 已完成 | `af80630` |
 | 7 | P2-1 `test_connection` 连接池泄漏（try/finally dispose） | ☑ 已完成 | `23c455a` |
-| 8 | P2-2 `confirm_many` 后台任务异常无人处理 + 并发（try/except + 每用户 Lock） | ☐ 未开始 | - |
+| 8 | P2-2 `confirm_many` 后台任务异常无人处理 + 并发（try/except + 每用户 Lock） | ☑ 已完成 | `7610d8b` |
 | 9 | P2-3 `CacheCleaner` 重启边界 + `cleanup_time` 无校验 | ☐ 未开始 | - |
 | 10 | P2-4 爬虫逐内容小事务（per-forum 缓冲批量写入 + 缓存批量更新） | ☐ 未开始 | - |
 | 11 | P2-5 概览统计改 SQL 聚合 | ☐ 未开始 | - |
